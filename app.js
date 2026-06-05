@@ -520,57 +520,99 @@ function showReciboModal(aposta) {
     const content = document.getElementById('reciboContent');
 
     const dataAposta = new Date(aposta.dataAposta);
-    const dataStr = dataAposta.toLocaleString('pt-PT', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    });
+    const dataStr = dataAposta.toLocaleDateString('pt-PT');
+    const horaStr = dataAposta.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'});
+
+    // Gerar linhas de código de barras simulado
+    const barcodeLines = aposta.recibo.split('').map(() => {
+        const widths = ['█', '▓', '▒', '░', '▄', '▀'];
+        return widths[Math.floor(Math.random() * widths.length)];
+    }).join('');
 
     content.innerHTML = `
         <div class="pos-recibo" id="posRecibo">
+            <!-- CABECALHO -->
             <div class="pos-header">
-                <h3>MOZLOTTOGANHA</h3>
-                <p>A sua sorte em cada bola</p>
-                <p>--------------------------------</p>
+                <div class="pos-stars">★ ★ ★ ★ ★</div>
+                <h3>🎱 MOZLOTTOGANHA</h3>
+                <div class="sub">A SUA SORTE EM CADA BOLA</div>
+                <div class="sub">RECIBO OFICIAL DE APOSTA</div>
             </div>
-            <div class="pos-line bold">
-                <span>RECIBO N:</span>
-                <span>${aposta.recibo}</span>
+
+            <hr class="pos-divider-double">
+
+            <!-- NUMERO DO RECIBO -->
+            <div class="pos-section-title">📋 NÚMERO DO RECIBO</div>
+            <div class="pos-line center big">
+                <span class="value">${aposta.recibo}</span>
+            </div>
+
+            <hr class="pos-divider">
+
+            <!-- DADOS DO SORTEIO -->
+            <div class="pos-section-title">🎯 DADOS DO SORTEIO</div>
+            <div class="pos-line">
+                <span class="label">Sorteio:</span>
+                <span class="value">${aposta.sorteioNome}</span>
             </div>
             <div class="pos-line">
-                <span>Data/Hora:</span>
-                <span>${dataStr}</span>
+                <span class="label">Hora do Sorteio:</span>
+                <span class="value">${aposta.sorteioHora}h</span>
             </div>
             <div class="pos-line">
-                <span>Sorteio:</span>
-                <span>${aposta.sorteioNome}</span>
+                <span class="label">Data da Aposta:</span>
+                <span class="value">${dataStr}</span>
             </div>
             <div class="pos-line">
-                <span>Hora Sorteio:</span>
-                <span>${aposta.sorteioHora}h</span>
+                <span class="label">Hora da Aposta:</span>
+                <span class="value">${horaStr}</span>
             </div>
-            <div class="pos-line">
-                <span>Chance:</span>
-                <span>Chance ${aposta.chance}</span>
+
+            <hr class="pos-divider">
+
+            <!-- TIPO DE CHANCE -->
+            <div class="pos-section-title">🎲 TIPO DE APOSTA</div>
+            <div class="pos-line center big">
+                <span class="value">CHANCE ${aposta.chance}</span>
             </div>
-            <div class="pos-line bold">
-                <span>Numeros Jogados:</span>
-                <span></span>
-            </div>
-            <div class="pos-balls">
+
+            <hr class="pos-divider-double">
+
+            <!-- NUMEROS JOGADOS -->
+            <div class="pos-section-title">🔢 NÚMEROS JOGADOS</div>
+            <div class="pos-balls-row">
                 ${aposta.numeros.map(n => `<div class="pos-ball">${n}</div>`).join('')}
             </div>
-            <div class="pos-line bold">
-                <span>Valor da Aposta:</span>
-                <span>${aposta.valor} MTN</span>
+
+            <hr class="pos-divider-double">
+
+            <!-- VALOR -->
+            <div class="pos-section-title">💰 VALOR DA APOSTA</div>
+            <div class="pos-valor-box">
+                <div class="label">Total a Pagar</div>
+                <div class="valor">${aposta.valor.toLocaleString('pt-PT')} MTN</div>
             </div>
-            <div class="pos-barcode">
-                ||| ${aposta.recibo} |||
+
+            <hr class="pos-divider">
+
+            <!-- CODIGO DE BARRAS -->
+            <div class="pos-barcode-area">
+                <div class="pos-barcode-lines">${barcodeLines}</div>
+                <div class="pos-barcode">${aposta.recibo}</div>
             </div>
+
+            <hr class="pos-divider">
+
+            <!-- RODAPE -->
             <div class="pos-footer">
-                <p>Boa Sorte!</p>
-                <p>Guarde este recibo para verificacao</p>
-                <p>--------------------------------</p>
+                <div class="pos-stars">★ ★ ★ ★ ★</div>
+                <p><strong>BOA SORTE! 🍀</strong></p>
+                <p>Guarde este recibo para verificação</p>
+                <p>Apresente-o para receber prémios</p>
+                <hr class="pos-divider">
                 <p>mozlottoganha.com</p>
+                <p>${dataStr} ${horaStr}</p>
+                <div class="pos-stars">★ ★ ★ ★ ★</div>
             </div>
         </div>
     `;
@@ -765,24 +807,65 @@ function printScreen() {
 <head>
     <title>Recibo MozLottoGanha</title>
     <style>
-        body { font-family: 'Courier New', monospace; padding: 20px; background: #f5f5f5; }
-        .pos-recibo { width: 300px; margin: 0 auto; background: #fff; border: 2px dashed #333; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .pos-header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 10px; }
-        .pos-header h3 { font-size: 18px; margin: 0; color: #1a1a2e; }
-        .pos-line { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px dotted #ccc; color: #333; }
-        .pos-line.bold { font-weight: bold; font-size: 13px; }
-        .pos-balls { display: flex; gap: 5px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
-        .pos-ball { width: 28px; height: 28px; border-radius: 50%; background: #1a1a2e; color: #f4c430; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
-        .pos-footer { text-align: center; margin-top: 10px; font-size: 10px; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
-        .pos-barcode { text-align: center; font-size: 20px; letter-spacing: 3px; margin: 10px 0; font-family: monospace; color: #333; }
+        @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none; }
+        }
+        body { 
+            font-family: 'Courier New', monospace; 
+            padding: 20px; background: #f5f5f5; 
+            display: flex; justify-content: center;
+        }
+        .pos-recibo { 
+            width: 320px; background: #fff; 
+            border: 1px solid #ccc; padding: 20px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .pos-header { text-align: center; padding-bottom: 8px; margin-bottom: 8px; }
+        .pos-header h3 { font-size: 20px; margin: 0; letter-spacing: 1px; color: #1a1a2e; }
+        .pos-header .sub { font-size: 11px; color: #666; margin: 2px 0; }
+        .pos-divider { border: none; border-top: 1px dashed #999; margin: 6px 0; }
+        .pos-divider-double { border: none; border-top: 2px solid #333; margin: 6px 0; }
+        .pos-section-title { text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 4px 0; color: #333; }
+        .pos-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+        .pos-line .label { color: #555; }
+        .pos-line .value { font-weight: 700; color: #1a1a2e; }
+        .pos-line.center { justify-content: center; text-align: center; }
+        .pos-line.bold { font-weight: 700; font-size: 13px; }
+        .pos-line.big { font-size: 16px; }
+        .pos-line.big .value { font-size: 18px; color: #d4a017; }
+        .pos-balls-row { display: flex; gap: 8px; justify-content: center; margin: 10px 0; flex-wrap: wrap; padding: 8px 0; }
+        .pos-ball {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f4c430, #d4a017, #b8860b);
+            border: 2px solid #8B6914;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 900; color: #1a1a2e;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .pos-barcode-area { text-align: center; margin: 10px 0; padding: 8px; background: #f5f5f5; border-radius: 4px; }
+        .pos-barcode { font-size: 14px; letter-spacing: 2px; font-family: monospace; font-weight: 700; color: #333; }
+        .pos-barcode-lines { font-size: 28px; line-height: 1; letter-spacing: -1px; color: #333; margin: 4px 0; }
+        .pos-footer { text-align: center; margin-top: 8px; font-size: 10px; color: #666; padding-top: 8px; }
+        .pos-footer p { margin: 2px 0; }
+        .pos-stars { font-size: 14px; letter-spacing: 3px; margin: 4px 0; text-align: center; }
+        .pos-valor-box { background: #1a1a2e; color: #f4c430; padding: 8px 15px; border-radius: 6px; text-align: center; margin: 8px 0; }
+        .pos-valor-box .label { font-size: 10px; text-transform: uppercase; }
+        .pos-valor-box .valor { font-size: 20px; font-weight: 900; }
+        .print-btn { 
+            display: block; width: 200px; margin: 20px auto; 
+            padding: 12px; background: #f4c430; color: #1a1a2e; 
+            border: none; border-radius: 8px; font-size: 16px; 
+            font-weight: 700; cursor: pointer;
+        }
     </style>
 </head>
 <body>
     ${recibo.outerHTML}
+    <button class="print-btn no-print" onclick="window.print()">🖨️ IMPRIMIR RECIBO</button>
     <script>
         window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
+            setTimeout(function() { window.print(); }, 300);
         };
     </scr` + `ipt>
 </body>

@@ -72,12 +72,14 @@ let bluetoothDevice = null;
 let bluetoothServer = null;
 let bluetoothCharacteristic = null;
 let ultimoDiaVerificado = null;
+let resultadosCache = {}; // Cache dos resultados do dia
 
 // ============================================
 // INICIALIZACAO
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     createParticles();
+    await carregarResultadosDoDia(); // NOVO: Carregar resultados primeiro
     renderSorteios();
     renderNumbersGrid();
     renderPremiosTab(5);
@@ -104,23 +106,44 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
+// CARREGAR RESULTADOS DO DIA (NOVO)
+// ============================================
+async function carregarResultadosDoDia() {
+    try {
+        const dataHoje = new Date().toISOString().split('T')[0];
+        const snapshot = await db.ref('mozlottoganha/resultados').once('value');
+        const resultados = snapshot.val() || {};
+
+        resultadosCache = {};
+
+        for (const sorteioId in resultados) {
+            if (resultados[sorteioId][dataHoje]) {
+                resultadosCache[sorteioId] = resultados[sorteioId][dataHoje];
+            }
+        }
+
+        console.log('Resultados carregados:', resultadosCache);
+    } catch (err) {
+        console.error('Erro ao carregar resultados:', err);
+    }
+}
+
+// ============================================
 // VERIFICAR MUDANCA DE DIA (00:00h)
 // ============================================
 function verificarMudancaDeDia() {
     const agora = new Date();
     const diaAtual = agora.getDate();
 
-    // Se mudou de dia (passou da meia-noite)
     if (ultimoDiaVerificado !== null && diaAtual !== ultimoDiaVerificado) {
         console.log('NOVO DIA DETETADO! Resetando sistema...');
         ultimoDiaVerificado = diaAtual;
+        resultadosCache = {}; // Limpar cache de resultados
 
-        // Resetar UI
         renderSorteios();
         updateJackpot();
         renderRecibos();
 
-        // Limpar selecao
         selectedSorteio = null;
         document.getElementById('sorteioNome').textContent = 'Nenhum';
         document.getElementById('sorteioHora').textContent = '--:--';
@@ -145,7 +168,7 @@ function createParticles() {
 }
 
 // ============================================
-// SORTEIOS
+// SORTEIOS - ATUALIZADO COM RESULTADOS
 // ============================================
 function renderSorteios() {
     const grid = document.getElementById('sorteiosGrid');
@@ -162,10 +185,20 @@ function renderSorteios() {
         let statusText = '';
         let statusClassBadge = '';
 
+        // VERIFICAR SE TEM RESULTADO NO CACHE
+        const resultado = resultadosCache[sorteio.id];
+        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
+
         if (jaPassou) {
-            statusClass = 'closed';
-            statusText = 'Encerrado';
-            statusClassBadge = 'status-closed';
+            if (temResultado) {
+                statusClass = 'winner'; // Verde pulsante se tem resultado
+                statusText = 'Realizado';
+                statusClassBadge = 'status-open';
+            } else {
+                statusClass = 'closed';
+                statusText = 'Encerrado';
+                statusClassBadge = 'status-closed';
+            }
         } else if (!estaAberto) {
             statusClass = 'closed';
             statusText = 'Fechado';
@@ -183,6 +216,19 @@ function renderSorteios() {
         const isSelected = selectedSorteio && selectedSorteio.id === sorteio.id;
         if (isSelected) statusClass += ' active';
 
+        // RENDERIZAR BOLAS - COM RESULTADO SE EXISTIR
+        let ballsHTML = '';
+        if (jaPassou && temResultado) {
+            // Mostrar bolas sorteadas
+            ballsHTML = resultado.numeros.map((n, i) => 
+                `<div class="ball" style="animation-delay:${i * 0.2}s">${n}</div>`
+            ).join('');
+        } else if (jaPassou) {
+            ballsHTML = '<span style="color:#aaa;font-size:12px;">Aguardando resultado...</span>';
+        } else {
+            ballsHTML = Array(5).fill(0).map(() => '<div class="ball-placeholder"></div>').join('');
+        }
+
         return `
             <div class="sorteio-card ${statusClass}" id="card-${sorteio.id}" onclick="selectSorteio('${sorteio.id}')">
                 <div class="sorteio-header">
@@ -193,11 +239,11 @@ function renderSorteios() {
                     <span class="sorteio-status ${statusClassBadge}">${statusText}</span>
                 </div>
                 <div class="sorteio-balls" id="balls-${sorteio.id}">
-                    ${jaPassou ? '<span style="color:#aaa;font-size:12px;">Aguardando resultado...</span>' : 
-                      Array(5).fill(0).map(() => '<div class="ball-placeholder"></div>').join('')}
+                    ${ballsHTML}
                 </div>
                 <div class="countdown ${minutosAteSorteio <= 30 && minutosAteSorteio > 0 ? 'urgent' : ''}" id="countdown-${sorteio.id}">
-                    ${jaPassou ? 'Sorteio realizado' : formatCountdown(minutosAteSorteio)}
+                    ${jaPassou && temResultado ? `Numeros: ${resultado.numeros.join(', ')}` : 
+                      (jaPassou ? 'Sorteio realizado' : formatCountdown(minutosAteSorteio))}
                 </div>
             </div>
         `;
@@ -237,11 +283,19 @@ function updateSorteiosStatus() {
         if (!card) return;
 
         const statusBadge = card.querySelector('.sorteio-status');
+        const resultado = resultadosCache[sorteio.id];
+        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
 
         if (minutosAteSorteio <= 0) {
-            card.classList.add('closed');
-            statusBadge.textContent = 'Encerrado';
-            statusBadge.className = 'sorteio-status status-closed';
+            if (temResultado) {
+                card.classList.add('winner');
+                statusBadge.textContent = 'Realizado';
+                statusBadge.className = 'sorteio-status status-open';
+            } else {
+                card.classList.add('closed');
+                statusBadge.textContent = 'Encerrado';
+                statusBadge.className = 'sorteio-status status-closed';
+            }
         } else if (minutosAteSorteio <= MINUTOS_FECHAMENTO) {
             card.classList.add('closed');
             statusBadge.textContent = 'Fechado';
@@ -259,12 +313,22 @@ function updateCountdowns() {
         if (!el) return;
 
         const minutosAteSorteio = sorteio.horaMin - minutosAtual;
+        const resultado = resultadosCache[sorteio.id];
+        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
 
         if (minutosAteSorteio <= 0) {
-            el.textContent = 'Sorteio realizado';
-            el.classList.remove('urgent');
+            if (temResultado) {
+                el.textContent = `Numeros: ${resultado.numeros.join(', ')}`;
+                el.classList.remove('urgent');
+                el.style.color = '#00ff88';
+            } else {
+                el.textContent = 'Sorteio realizado';
+                el.classList.remove('urgent');
+                el.style.color = '';
+            }
         } else {
             el.textContent = formatCountdown(minutosAteSorteio);
+            el.style.color = '';
             if (minutosAteSorteio <= 30) {
                 el.classList.add('urgent');
             } else {
@@ -440,16 +504,7 @@ function getDataSorteio(horaMin) {
     const sorteioHora = Math.floor(horaMin / 60);
     const sorteioMin = horaMin % 60;
 
-    // Criar data do sorteio para HOJE
     const sorteioDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sorteioHora, sorteioMin);
-
-    // Se o sorteio ja passou hoje (hora atual > hora do sorteio), 
-    // significa que estamos apostando para o PROXIMO dia
-    // MAS como os sorteios sao diarios e comecam as 8h, 
-    // se for meia-noite (0h), todos os sorteios sao para HOJE
-
-    // Se for depois do horario do sorteio, vai para amanha
-    // Se for antes (incluindo meia-noite), fica para hoje
     if (sorteioDate < now) {
         sorteioDate.setDate(sorteioDate.getDate() + 1);
     }
@@ -873,7 +928,7 @@ async function verificarRecibo() {
 }
 
 // ============================================
-// SORTEIO AUTOMATICO
+// SORTEIO AUTOMATICO - ATUALIZADO
 // ============================================
 async function verificarSorteiosPendentes() {
     const now = new Date();
@@ -926,6 +981,15 @@ async function realizarSorteio(sorteio, dataSorteio) {
             totalApostas: apostasList.length
         });
 
+        // ATUALIZAR CACHE LOCAL
+        resultadosCache[sorteio.id] = {
+            numeros: numerosVencedores,
+            data: new Date().toISOString(),
+            acumulado: acumulado,
+            fundoPremios: fundoPremios,
+            totalApostas: apostasList.length
+        };
+
         // Atualizar UI com bolas sorteadas
         const ballsContainer = document.getElementById(`balls-${sorteio.id}`);
         if (ballsContainer) {
@@ -934,9 +998,25 @@ async function realizarSorteio(sorteio, dataSorteio) {
             ).join('');
         }
 
+        // Atualizar countdown com numeros
+        const countdownEl = document.getElementById(`countdown-${sorteio.id}`);
+        if (countdownEl) {
+            countdownEl.textContent = `Numeros: ${numerosVencedores.join(', ')}`;
+            countdownEl.style.color = '#00ff88';
+            countdownEl.classList.remove('urgent');
+        }
+
         // Marcar card como vencedor
         const card = document.getElementById(`card-${sorteio.id}`);
-        if (card) card.classList.add('winner');
+        if (card) {
+            card.classList.remove('closed');
+            card.classList.add('winner');
+            const statusBadge = card.querySelector('.sorteio-status');
+            if (statusBadge) {
+                statusBadge.textContent = 'Realizado';
+                statusBadge.className = 'sorteio-status status-open';
+            }
+        }
 
         // Atualizar apostas com resultados
         for (const [recibo, aposta] of Object.entries(apostas)) {

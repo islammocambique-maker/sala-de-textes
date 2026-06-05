@@ -71,6 +71,7 @@ let recibosLocal = JSON.parse(localStorage.getItem('mozlottoganha_recibos') || '
 let bluetoothDevice = null;
 let bluetoothServer = null;
 let bluetoothCharacteristic = null;
+let ultimoDiaVerificado = null;
 
 // ============================================
 // INICIALIZACAO
@@ -85,6 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     startCountdowns();
     populateAdminSelects();
 
+    // Guardar o dia atual
+    ultimoDiaVerificado = new Date().getDate();
+
     // Verificar sorteios pendentes a cada minuto
     setInterval(verificarSorteiosPendentes, 60000);
 
@@ -92,11 +96,38 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => {
         updateSorteiosStatus();
         updateCountdowns();
+        verificarMudancaDeDia();
     }, 1000);
 
     // Verificar sorteios imediatamente
     verificarSorteiosPendentes();
 });
+
+// ============================================
+// VERIFICAR MUDANCA DE DIA (00:00h)
+// ============================================
+function verificarMudancaDeDia() {
+    const agora = new Date();
+    const diaAtual = agora.getDate();
+
+    // Se mudou de dia (passou da meia-noite)
+    if (ultimoDiaVerificado !== null && diaAtual !== ultimoDiaVerificado) {
+        console.log('NOVO DIA DETETADO! Resetando sistema...');
+        ultimoDiaVerificado = diaAtual;
+
+        // Resetar UI
+        renderSorteios();
+        updateJackpot();
+        renderRecibos();
+
+        // Limpar selecao
+        selectedSorteio = null;
+        document.getElementById('sorteioNome').textContent = 'Nenhum';
+        document.getElementById('sorteioHora').textContent = '--:--';
+
+        showToast('NOVO DIA! Todos os sorteios estao abertos para apostas!', 'success');
+    }
+}
 
 // ============================================
 // PARTICULAS ANIMADAS
@@ -409,7 +440,16 @@ function getDataSorteio(horaMin) {
     const sorteioHora = Math.floor(horaMin / 60);
     const sorteioMin = horaMin % 60;
 
+    // Criar data do sorteio para HOJE
     const sorteioDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sorteioHora, sorteioMin);
+
+    // Se o sorteio ja passou hoje (hora atual > hora do sorteio), 
+    // significa que estamos apostando para o PROXIMO dia
+    // MAS como os sorteios sao diarios e comecam as 8h, 
+    // se for meia-noite (0h), todos os sorteios sao para HOJE
+
+    // Se for depois do horario do sorteio, vai para amanha
+    // Se for antes (incluindo meia-noite), fica para hoje
     if (sorteioDate < now) {
         sorteioDate.setDate(sorteioDate.getDate() + 1);
     }

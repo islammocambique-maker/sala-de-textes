@@ -281,27 +281,80 @@
 
         /* Recibo POS */
         .pos-recibo {
-            background: #fff; color: #1a1a2e; padding: 25px;
-            border-radius: 8px; font-family: 'Courier New', monospace;
-            border: 2px dashed #333;
+            background: #fff; color: #1a1a2e; padding: 20px;
+            border-radius: 4px; font-family: 'Courier New', monospace;
+            border: 1px solid #ccc; max-width: 320px; margin: 0 auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
-        .pos-header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 10px; }
-        .pos-header h3 { font-size: 18px; font-weight: 900; }
-        .pos-header p { font-size: 10px; color: #666; }
-        .pos-line { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px dotted #ccc; }
+        .pos-header { text-align: center; padding-bottom: 8px; margin-bottom: 8px; }
+        .pos-header h3 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: 1px; }
+        .pos-header .sub { font-size: 11px; color: #666; margin: 2px 0; }
+        .pos-divider {
+            border: none; border-top: 1px dashed #999;
+            margin: 6px 0;
+        }
+        .pos-divider-double {
+            border: none; border-top: 2px solid #333;
+            margin: 6px 0;
+        }
+        .pos-section-title {
+            text-align: center; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 2px;
+            margin: 4px 0; color: #333;
+        }
+        .pos-line { 
+            display: flex; justify-content: space-between; 
+            padding: 3px 0; font-size: 12px; 
+        }
+        .pos-line .label { color: #555; }
+        .pos-line .value { font-weight: 700; color: #1a1a2e; }
+        .pos-line.center { justify-content: center; text-align: center; }
         .pos-line.bold { font-weight: 700; font-size: 13px; }
-        .pos-balls { display: flex; gap: 5px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .pos-line.big { font-size: 16px; }
+        .pos-line.big .value { font-size: 18px; color: #d4a017; }
+
+        .pos-balls-row {
+            display: flex; gap: 8px; justify-content: center; 
+            margin: 10px 0; flex-wrap: wrap; padding: 8px 0;
+        }
         .pos-ball {
-            width: 28px; height: 28px; border-radius: 50%;
-            background: #1a1a2e; color: #f4c430;
+            width: 36px; height: 36px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f4c430, #d4a017, #b8860b);
+            border: 2px solid #8B6914;
             display: flex; align-items: center; justify-content: center;
-            font-size: 12px; font-weight: 700;
+            font-size: 14px; font-weight: 900; color: #1a1a2e;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        .pos-footer { text-align: center; margin-top: 10px; font-size: 10px; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
+
+        .pos-barcode-area {
+            text-align: center; margin: 10px 0; padding: 8px;
+            background: #f5f5f5; border-radius: 4px;
+        }
         .pos-barcode {
-            text-align: center; font-size: 24px; letter-spacing: 3px;
-            margin: 10px 0; font-family: monospace;
+            font-size: 14px; letter-spacing: 2px;
+            font-family: monospace; font-weight: 700;
+            color: #333;
         }
+        .pos-barcode-lines {
+            font-size: 28px; line-height: 1;
+            letter-spacing: -1px; color: #333;
+            margin: 4px 0;
+        }
+
+        .pos-footer { 
+            text-align: center; margin-top: 8px; 
+            font-size: 10px; color: #666; padding-top: 8px; 
+        }
+        .pos-footer p { margin: 2px 0; }
+        .pos-stars { font-size: 14px; letter-spacing: 3px; margin: 4px 0; }
+
+        .pos-valor-box {
+            background: #1a1a2e; color: #f4c430;
+            padding: 8px 15px; border-radius: 6px;
+            text-align: center; margin: 8px 0;
+        }
+        .pos-valor-box .label { font-size: 10px; text-transform: uppercase; }
+        .pos-valor-box .valor { font-size: 20px; font-weight: 900; }
 
         /* Print Section */
         .print-btns { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
@@ -524,7 +577,7 @@
         <section class="recibos-section">
             <h2 class="section-title">🔍 Verificar Recibo</h2>
             <div class="verificar-section">
-                <input type="text" id="verificarInput" placeholder="Digite o número do recibo..." maxlength="12">
+                <input type="text" id="verificarInput" placeholder="Digite o número do recibo..." maxlength="20" style="text-transform:uppercase;">
                 <button class="btn btn-primary" onclick="verificarRecibo()">Verificar</button>
             </div>
             <div id="verificarResult"></div>

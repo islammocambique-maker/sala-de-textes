@@ -1,10 +1,10 @@
 // ============================================
-// MOZLOTTOGANHA - APP.JS COMPLETO (v2)
+// MOZLOTTOGANHA - APP.JS COMPLETO (v4)
 // Sistema de Lotaria & P.O.S
-// CORREÇÃO: Impressão Bluetooth dividida em chunks
+// SEM referencias a Islam Mocambique
 // ============================================
 
-// --- CONFIGURAÇÃO FIREBASE ---
+// --- CONFIGURACAO FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyCW9ZZadm4WJ_FKtOjvkP1czsfImwzl98c",
     authDomain: "mozcoin.firebaseapp.com",
@@ -19,10 +19,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- CONFIGURAÇÃO DOS SORTEIOS ---
+// --- CONFIGURACAO DOS SORTEIOS ---
 const SORTEOS_CONFIG = [
-    { id: 'sorteio1', nome: 'Sorteio da Manhã', hora: '09:00' },
-    { id: 'sorteio2', nome: 'Sorteio da Manhã 2', hora: '11:00' },
+    { id: 'sorteio1', nome: 'Sorteio da Manha', hora: '09:00' },
+    { id: 'sorteio2', nome: 'Sorteio da Manha 2', hora: '11:00' },
     { id: 'sorteio3', nome: 'Sorteio do Meio-Dia', hora: '13:00' },
     { id: 'sorteio4', nome: 'Sorteio da Tarde', hora: '15:00' },
     { id: 'sorteio5', nome: 'Sorteio da Tarde 2', hora: '17:00' },
@@ -31,23 +31,25 @@ const SORTEOS_CONFIG = [
     { id: 'sorteio8', nome: 'Sorteio da Meia-Noite', hora: '23:00' }
 ];
 
-// --- ESTADO DA APLICAÇÃO ---
+// --- ESTADO DA APLICACAO ---
 let estado = {
     sorteioSelecionado: null,
     chanceSelecionada: 5,
     numerosSelecionados: [],
     sorteios: {},
-    timerInterval: null
+    timerInterval: null,
+    ultimaAposta: null,
+    btDevice: null,
+    btCharacteristic: null
 };
 
-// --- INICIALIZAÇÃO ---
+// --- INICIALIZACAO ---
 document.addEventListener('DOMContentLoaded', () => {
     initParticles();
     initSorteios();
     initNumbersGrid();
     startTimer();
 
-    // Listener em tempo real para resultados dos sorteios
     db.ref('mozlotto/sorteios').on('value', (snapshot) => {
         const data = snapshot.val() || {};
         estado.sorteios = data;
@@ -56,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// SISTEMA DE PARTÍCULAS (FUNDO ANIMADO)
+// SISTEMA DE PARTICULAS
 // ============================================
 function initParticles() {
     const canvas = document.createElement('canvas');
@@ -87,20 +89,15 @@ function initParticles() {
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-
+            p.x += p.vx; p.y += p.vy;
             if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
             if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(0, 255, 136, ${p.opacity})`;
             ctx.fill();
         });
-
         requestAnimationFrame(animate);
     }
     animate();
@@ -146,7 +143,7 @@ function selecionarSorteio(sorteioId) {
 
     const card = document.getElementById(`card-${sorteioId}`);
     if (card.classList.contains('closed')) {
-        alert('Este sorteio já foi realizado! Selecione um sorteio aberto.');
+        alert('Este sorteio ja foi realizado! Selecione um sorteio aberto.');
         return;
     }
 
@@ -231,9 +228,6 @@ function startTimer() {
     }, 1000);
 }
 
-// ============================================
-// REALIZAR SORTEIO
-// ============================================
 function realizarSorteio(sorteioId) {
     db.ref(`mozlotto/sorteios/${sorteioId}/resultado`).once('value', (snapshot) => {
         if (snapshot.exists()) return;
@@ -244,10 +238,9 @@ function realizarSorteio(sorteioId) {
         }
         const resultado = Array.from(numeros).sort((a, b) => a - b);
 
-        const agora = new Date();
         db.ref(`mozlotto/sorteios/${sorteioId}`).set({
             resultado: resultado,
-            dataRealizacao: agora.toISOString(),
+            dataRealizacao: new Date().toISOString(),
             totalApostas: 0,
             totalPremios: 0
         });
@@ -272,7 +265,7 @@ function forcarSorteio(sorteioId) {
 }
 
 // ============================================
-// GRELLHA NUMÉRICA (1-90)
+// GRELLHA NUMERICA (1-90)
 // ============================================
 function initNumbersGrid() {
     const grid = document.getElementById('numbersGrid');
@@ -318,7 +311,7 @@ function toggleNumero(numero) {
             estado.numerosSelecionados.push(numero);
             estado.numerosSelecionados.sort((a, b) => a - b);
         } else {
-            alert(`Você só pode selecionar ${estado.chanceSelecionada} números para Chance ${estado.chanceSelecionada}!`);
+            alert(`Voce so pode selecionar ${estado.chanceSelecionada} numeros para Chance ${estado.chanceSelecionada}!`);
             return;
         }
     }
@@ -364,7 +357,7 @@ function fazerAposta() {
     }
 
     if (estado.numerosSelecionados.length !== estado.chanceSelecionada) {
-        alert(`Selecione exatamente ${estado.chanceSelecionada} números!`);
+        alert(`Selecione exatamente ${estado.chanceSelecionada} numeros!`);
         return;
     }
 
@@ -392,6 +385,7 @@ function fazerAposta() {
     db.ref(`mozlotto/apostas/${idRecibo}`).set(aposta)
         .then(() => {
             db.ref(`mozlotto/sorteios/${estado.sorteioSelecionado}/totalApostas`).transaction(c => (c || 0) + 1);
+            estado.ultimaAposta = aposta;
             mostrarRecibo(aposta);
             clearSelection();
         })
@@ -424,7 +418,7 @@ function mostrarRecibo(aposta) {
             <div class="pos-header">
                 <h3>MOZLOTTOGANHA</h3>
                 <div class="sub">Sistema de Lotaria & P.O.S</div>
-                <div class="sub">Moçambique</div>
+                <div class="sub">Mocambique</div>
             </div>
             <div class="pos-divider">========================</div>
             <div class="pos-section-title">RECIBO DE APOSTA</div>
@@ -472,8 +466,6 @@ function mostrarRecibo(aposta) {
             <div class="pos-footer">
                 <p>Guarde este recibo para verificacao</p>
                 <p>Apresente em caso de premio</p>
-                <p>Suporte: 860407269</p>
-                <p>Islammocambique@gmail.com</p>
                 <p>BOA SORTE!</p>
             </div>
         </div>
@@ -530,240 +522,268 @@ function printScreen() {
 }
 
 // ============================================
-// IMPRESSAO BLUETOOTH CORRIGIDA
-// Divide em chunks de 512 bytes e usa ESC/POS
+// IMPRESSAO BLUETOOTH v4 - PARA IMPRESSORA TERMICA POS
 // ============================================
 async function printBluetooth() {
+    // Verificar se ja temos conexao guardada
+    if (estado.btDevice && estado.btCharacteristic) {
+        try {
+            // Verificar se ainda esta conectado
+            if (estado.btDevice.gatt.connected) {
+                await enviarParaImpressora(estado.btCharacteristic);
+                return;
+            }
+        } catch (e) {
+            console.log('Reconectando...');
+            estado.btDevice = null;
+            estado.btCharacteristic = null;
+        }
+    }
+
     if (!navigator.bluetooth) {
-        alert('Web Bluetooth API nao disponivel. Use Chrome/Edge no Android ou imprima via navegador.');
+        alert('Web Bluetooth nao disponivel. Use Chrome no Android.');
         return;
     }
 
     try {
-        // Comandos ESC/POS basicos
-        const ESC = 0x1B;
-        const GS = 0x1D;
-        const INIT = new Uint8Array([ESC, 0x40]); // Initialize printer
-        const CENTER = new Uint8Array([ESC, 0x61, 0x01]); // Center align
-        const LEFT = new Uint8Array([ESC, 0x61, 0x00]); // Left align
-        const BOLD_ON = new Uint8Array([ESC, 0x45, 0x01]); // Bold on
-        const BOLD_OFF = new Uint8Array([ESC, 0x45, 0x00]); // Bold off
-        const DOUBLE_ON = new Uint8Array([ESC, 0x21, 0x30]); // Double width/height
-        const DOUBLE_OFF = new Uint8Array([ESC, 0x21, 0x00]); // Normal
-        const CUT = new Uint8Array([GS, 0x56, 0x00]); // Cut paper
-        const FEED = new Uint8Array([ESC, 0x64, 0x03]); // Feed 3 lines
-        const LINE = new Uint8Array([0x0A]); // Line feed
-
-        const aposta = estado.ultimaAposta;
-        if (!aposta) {
-            alert('Nenhuma aposta recente para imprimir.');
-            return;
-        }
-
-        const multiplicadores = { 2: '40x', 3: '100x', 4: '300x', 5: '1000x' };
-        const data = new Date(aposta.dataAposta);
-        const dataStr = data.toLocaleDateString('pt-MZ');
-        const horaStr = data.toLocaleTimeString('pt-MZ');
-
-        // Construir conteudo do recibo em texto simples (sem acentos para compatibilidade)
-        const linhas = [
-            '    MOZLOTTOGANHA',
-            'Sistema de Lotaria & P.O.S',
-            '    Mocambique',
-            '========================',
-            '     RECIBO DE APOSTA',
-            '------------------------',
-            `ID: ${aposta.id}`,
-            `Data: ${dataStr} ${horaStr}`,
-            '------------------------',
-            `SORTEIO: ${aposta.sorteioNome}`,
-            `Hora: ${aposta.sorteioHora}`,
-            '------------------------',
-            '    NUMEROS APOSTADOS',
-            `    ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(' ')}`,
-            `Chance: ${aposta.chance} (${multiplicadores[aposta.chance]})`,
-            '------------------------',
-            '   VALOR DA APOSTA',
-            `   ${aposta.valor.toFixed(2)} MTN`,
-            '',
-            '   PREMIO POTENCIAL',
-            `   ${aposta.premioPotencial.toFixed(2)} MTN`,
-            '------------------------',
-            `Cod: ${aposta.id}`,
-            '========================',
-            'Guarde este recibo',
-            'Apresente em caso de premio',
-            'Suporte: 860407269',
-            'Islammocambique@gmail.com',
-            '      BOA SORTE!',
-            ''
+        // Lista de servicos e caracteristicas conhecidas
+        const BT_CONFIGS = [
+            { service: '000018f0-0000-1000-8000-00805f9b34fb', characteristic: '00002af1-0000-1000-8000-00805f9b34fb' },
+            { service: '000018f0-0000-1000-8000-00805f9b34fb', characteristic: 'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f' },
+            { service: 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', characteristic: 'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f' },
+            { service: '0000ff00-0000-1000-8000-00805f9b34fb', characteristic: '0000ff02-0000-1000-8000-00805f9b34fb' },
+            { service: '0000ff00-0000-1000-8000-00805f9b34fb', characteristic: '0000ff01-0000-1000-8000-00805f9b34fb' },
+            { service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', characteristic: '6e400002-b5a3-f393-e0a9-e50e24dcca9e' },
+            { service: '0000ffe0-0000-1000-8000-00805f9b34fb', characteristic: '0000ffe1-0000-1000-8000-00805f9b34fb' },
+            { service: '49535343-fe7d-4ae5-8fa9-9fafd205e455', characteristic: '49535343-8841-43f4-a8d4-ecbe34729bb3' }
         ];
 
-        // Converter para bytes
-        const encoder = new TextEncoder();
-        let allBytes = new Uint8Array(0);
-
-        // Adicionar init
-        allBytes = concatBytes(allBytes, INIT);
-        allBytes = concatBytes(allBytes, CENTER);
-        allBytes = concatBytes(allBytes, BOLD_ON);
-        allBytes = concatBytes(allBytes, DOUBLE_ON);
-        allBytes = concatBytes(allBytes, encoder.encode('MOZLOTTOGANHA'));
-        allBytes = concatBytes(allBytes, DOUBLE_OFF);
-        allBytes = concatBytes(allBytes, BOLD_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Sistema de Lotaria & P.O.S'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Mocambique'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('========================'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, BOLD_ON);
-        allBytes = concatBytes(allBytes, encoder.encode('RECIBO DE APOSTA'));
-        allBytes = concatBytes(allBytes, BOLD_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, LEFT);
-        allBytes = concatBytes(allBytes, encoder.encode(`ID: ${aposta.id}`));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode(`Data: ${dataStr} ${horaStr}`));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, BOLD_ON);
-        allBytes = concatBytes(allBytes, encoder.encode(`SORTEIO: ${aposta.sorteioNome}`));
-        allBytes = concatBytes(allBytes, BOLD_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode(`Hora: ${aposta.sorteioHora}`));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, CENTER);
-        allBytes = concatBytes(allBytes, encoder.encode('NUMEROS APOSTADOS'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, DOUBLE_ON);
-        allBytes = concatBytes(allBytes, encoder.encode(aposta.numeros.map(n => String(n).padStart(2,'0')).join(' ')));
-        allBytes = concatBytes(allBytes, DOUBLE_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode(`Chance ${aposta.chance} (${multiplicadores[aposta.chance]})`));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, encoder.encode('VALOR DA APOSTA'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, DOUBLE_ON);
-        allBytes = concatBytes(allBytes, encoder.encode(`${aposta.valor.toFixed(2)} MTN`));
-        allBytes = concatBytes(allBytes, DOUBLE_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, encoder.encode('PREMIO POTENCIAL'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, DOUBLE_ON);
-        allBytes = concatBytes(allBytes, encoder.encode(`${aposta.premioPotencial.toFixed(2)} MTN`));
-        allBytes = concatBytes(allBytes, DOUBLE_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
-        allBytes = concatBytes(allBytes, LINE);
-
-        allBytes = concatBytes(allBytes, encoder.encode(`Cod: ${aposta.id}`));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('========================'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Guarde este recibo'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Apresente em caso de premio'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Suporte: 860407269'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, encoder.encode('Islammocambique@gmail.com'));
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, BOLD_ON);
-        allBytes = concatBytes(allBytes, DOUBLE_ON);
-        allBytes = concatBytes(allBytes, encoder.encode('BOA SORTE!'));
-        allBytes = concatBytes(allBytes, DOUBLE_OFF);
-        allBytes = concatBytes(allBytes, BOLD_OFF);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, LINE);
-        allBytes = concatBytes(allBytes, FEED);
-        allBytes = concatBytes(allBytes, CUT);
-
-        // Conectar a impressora
         const device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
-                { namePrefix: 'Printer' },
-                { namePrefix: 'POS' },
-                { namePrefix: 'Bluetooth' }
-            ],
-            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000ff00-0000-1000-8000-00805f9b34fb']
+            acceptAllDevices: true,
+            optionalServices: BT_CONFIGS.map(c => c.service)
         });
 
+        estado.btDevice = device;
+        console.log('Dispositivo:', device.name);
+
         const server = await device.gatt.connect();
-
-        // Tentar diferentes servicos e caracteristicas comuns em impressoras termicas
-        const servicesToTry = [
-            '000018f0-0000-1000-8000-00805f9b34fb',
-            'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-            '0000ff00-0000-1000-8000-00805f9b34fb'
-        ];
-
-        const characteristicsToTry = [
-            '00002af1-0000-1000-8000-00805f9b34fb',
-            'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
-            '0000ff02-0000-1000-8000-00805f9b34fb'
-        ];
+        console.log('GATT conectado');
 
         let characteristic = null;
 
-        for (const serviceUUID of servicesToTry) {
+        // Tentar configuracoes conhecidas
+        for (const config of BT_CONFIGS) {
             try {
-                const service = await server.getPrimaryService(serviceUUID);
-                for (const charUUID of characteristicsToTry) {
-                    try {
-                        characteristic = await service.getCharacteristic(charUUID);
-                        break;
-                    } catch (e) {}
-                }
-                if (characteristic) break;
+                const service = await server.getPrimaryService(config.service);
+                try {
+                    characteristic = await service.getCharacteristic(config.characteristic);
+                    console.log('Encontrado:', config.service, config.characteristic);
+                    break;
+                } catch (e) {}
             } catch (e) {}
         }
 
+        // Auto-descoberta
         if (!characteristic) {
-            throw new Error('Nao foi possivel encontrar a caracteristica de impressao. Tente outra impressora.');
+            const services = await server.getPrimaryServices();
+            for (const service of services) {
+                const chars = await service.getCharacteristics();
+                for (const char of chars) {
+                    if (char.properties.write || char.properties.writeWithoutResponse) {
+                        characteristic = char;
+                        break;
+                    }
+                }
+                if (characteristic) break;
+            }
         }
 
-        // Enviar em chunks de 500 bytes (deixando margem de seguranca)
-        const CHUNK_SIZE = 500;
-        for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
-            const chunk = allBytes.slice(i, i + CHUNK_SIZE);
-            await characteristic.writeValue(chunk);
-            // Pequena pausa entre chunks para a impressora processar
-            await new Promise(r => setTimeout(r, 100));
+        if (!characteristic) {
+            throw new Error('Nenhuma caracteristica de escrita encontrada.');
         }
 
-        alert('Recibo enviado para impressora Bluetooth com sucesso!');
+        estado.btCharacteristic = characteristic;
+        await enviarParaImpressora(characteristic);
 
     } catch (err) {
-        console.error('Erro Bluetooth:', err);
-        alert('Erro ao imprimir: ' + err.message + '\n\nTente usar "Imprimir via Navegador (P.O.S)" como alternativa.');
+        console.error('Erro:', err);
+        alert('Erro: ' + err.message + '\nUse "Imprimir via Navegador" como alternativa.');
     }
 }
 
-// Funcao auxiliar para concatenar Uint8Arrays
-function concatBytes(a, b) {
-    const result = new Uint8Array(a.length + b.length);
-    result.set(a, 0);
-    result.set(b, a.length);
-    return result;
+async function enviarParaImpressora(characteristic) {
+    const aposta = estado.ultimaAposta;
+    if (!aposta) {
+        alert('Nenhuma aposta para imprimir.');
+        return;
+    }
+
+    // ESC/POS
+    const ESC = 0x1B;
+    const GS = 0x1D;
+    const INIT = new Uint8Array([ESC, 0x40]);
+    const CENTER = new Uint8Array([ESC, 0x61, 0x01]);
+    const LEFT = new Uint8Array([ESC, 0x61, 0x00]);
+    const BOLD_ON = new Uint8Array([ESC, 0x45, 0x01]);
+    const BOLD_OFF = new Uint8Array([ESC, 0x45, 0x00]);
+    const DOUBLE_ON = new Uint8Array([ESC, 0x21, 0x30]);
+    const DOUBLE_OFF = new Uint8Array([ESC, 0x21, 0x00]);
+    const HEIGHT_ON = new Uint8Array([ESC, 0x21, 0x10]);
+    const HEIGHT_OFF = new Uint8Array([ESC, 0x21, 0x00]);
+    const CUT = new Uint8Array([GS, 0x56, 0x00]);
+    const FEED_3 = new Uint8Array([ESC, 0x64, 0x03]);
+    const FEED_5 = new Uint8Array([ESC, 0x64, 0x05]);
+    const LINE = new Uint8Array([0x0A]);
+
+    const multiplicadores = { 2: '40x', 3: '100x', 4: '300x', 5: '1000x' };
+    const data = new Date(aposta.dataAposta);
+    const dataStr = data.toLocaleDateString('pt-MZ');
+    const horaStr = data.toLocaleTimeString('pt-MZ');
+
+    const partes = [];
+
+    function addBytes(arr) { partes.push(arr); }
+    function addText(txt) { partes.push(new TextEncoder().encode(txt)); }
+
+    addBytes(INIT);
+    addBytes(FEED_3);
+
+    addBytes(CENTER);
+    addBytes(BOLD_ON);
+    addBytes(DOUBLE_ON);
+    addText('MOZLOTTOGANHA');
+    addBytes(DOUBLE_OFF);
+    addBytes(BOLD_OFF);
+    addBytes(LINE);
+    addText('Sistema de Lotaria');
+    addBytes(LINE);
+    addText('Mocambique');
+    addBytes(LINE);
+    addText('========================');
+    addBytes(LINE);
+
+    addBytes(BOLD_ON);
+    addText('RECIBO DE APOSTA');
+    addBytes(BOLD_OFF);
+    addBytes(LINE);
+    addText('------------------------');
+    addBytes(LINE);
+
+    addBytes(LEFT);
+    addText(`ID: ${aposta.id}`);
+    addBytes(LINE);
+    addText(`Data: ${dataStr} ${horaStr}`);
+    addBytes(LINE);
+    addText('------------------------');
+    addBytes(LINE);
+
+    addBytes(BOLD_ON);
+    addText(`SORTEIO: ${aposta.sorteioNome}`);
+    addBytes(BOLD_OFF);
+    addBytes(LINE);
+    addText(`Hora: ${aposta.sorteioHora}`);
+    addBytes(LINE);
+    addText('------------------------');
+    addBytes(LINE);
+
+    addBytes(CENTER);
+    addText('NUMEROS APOSTADOS');
+    addBytes(LINE);
+    addBytes(DOUBLE_ON);
+    addText(aposta.numeros.map(n => String(n).padStart(2,'0')).join(' '));
+    addBytes(DOUBLE_OFF);
+    addBytes(LINE);
+    addText(`Chance ${aposta.chance} (${multiplicadores[aposta.chance]})`);
+    addBytes(LINE);
+    addText('------------------------');
+    addBytes(LINE);
+
+    addText('VALOR DA APOSTA');
+    addBytes(LINE);
+    addBytes(HEIGHT_ON);
+    addText(`${aposta.valor.toFixed(2)} MTN`);
+    addBytes(HEIGHT_OFF);
+    addBytes(LINE);
+    addBytes(LINE);
+
+    addText('PREMIO POTENCIAL');
+    addBytes(LINE);
+    addBytes(HEIGHT_ON);
+    addText(`${aposta.premioPotencial.toFixed(2)} MTN`);
+    addBytes(HEIGHT_OFF);
+    addBytes(LINE);
+    addText('------------------------');
+    addBytes(LINE);
+
+    addText(`Cod: ${aposta.id}`);
+    addBytes(LINE);
+    addText('========================');
+    addBytes(LINE);
+    addText('Guarde este recibo');
+    addBytes(LINE);
+    addText('Apresente em caso de premio');
+    addBytes(LINE);
+    addBytes(LINE);
+
+    addBytes(BOLD_ON);
+    addBytes(DOUBLE_ON);
+    addText('BOA SORTE!');
+    addBytes(DOUBLE_OFF);
+    addBytes(BOLD_OFF);
+    addBytes(LINE);
+    addBytes(LINE);
+    addBytes(LINE);
+    addBytes(FEED_5);
+    addBytes(CUT);
+
+    // Juntar tudo
+    let totalLength = 0;
+    partes.forEach(p => totalLength += p.length);
+    const allBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    partes.forEach(p => {
+        allBytes.set(p, offset);
+        offset += p.length;
+    });
+
+    console.log('Total bytes:', allBytes.length);
+
+    // ENVIAR EM CHUNKS DE 100 BYTES (ultra-seguro para POS)
+    const CHUNK_SIZE = 100;
+    const totalChunks = Math.ceil(allBytes.length / CHUNK_SIZE);
+
+    for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
+        const chunk = allBytes.slice(i, i + CHUNK_SIZE);
+        const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
+
+        console.log(`Chunk ${chunkNum}/${totalChunks}: ${chunk.length} bytes`);
+
+        try {
+            if (characteristic.properties.writeWithoutResponse) {
+                await characteristic.writeValueWithoutResponse(chunk);
+            } else if (characteristic.properties.write) {
+                await characteristic.writeValue(chunk);
+            } else {
+                throw new Error('Sem permissao de escrita');
+            }
+        } catch (writeErr) {
+            console.error(`Erro chunk ${chunkNum}:`, writeErr);
+            // Tentar com 50 bytes
+            if (chunk.length > 50) {
+                const half = chunk.slice(0, 50);
+                const rest = chunk.slice(50);
+                await characteristic.writeValueWithoutResponse(half);
+                await new Promise(r => setTimeout(r, 200));
+                await characteristic.writeValueWithoutResponse(rest);
+            } else {
+                throw writeErr;
+            }
+        }
+
+        await new Promise(r => setTimeout(r, 200));
+    }
+
+    alert('Recibo enviado com sucesso!');
 }
 
 // ============================================
@@ -785,11 +805,10 @@ function verificarRecibo() {
         const aposta = snapshot.val();
 
         if (!aposta) {
-            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo nao encontrado! Verifique o ID.</p>';
+            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo nao encontrado!</p>';
             return;
         }
 
-        // Guardar aposta para impressao
         estado.ultimaAposta = aposta;
 
         db.ref(`mozlotto/sorteios/${aposta.sorteioId}/resultado`).once('value', (resSnapshot) => {
@@ -805,7 +824,6 @@ function verificarRecibo() {
                         <p><strong>Chance:</strong> ${aposta.chance}</p>
                         <p><strong>Valor:</strong> ${aposta.valor.toFixed(2)} MTN</p>
                         <p><strong>Status:</strong> <span style="color: #f4c430;">⏳ Aguardando sorteio</span></p>
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">O sorteio ainda nao foi realizado. Volte apos ${aposta.sorteioHora}.</p>
                     </div>
                 `;
                 return;
@@ -822,7 +840,7 @@ function verificarRecibo() {
             }
 
             const statusColor = ganhou ? '#00ff88' : (numAcertos > 0 ? '#f4c430' : '#ff4a4a');
-            const statusText = ganhou ? '🎉 GANHADOR!' : (numAcertos > 0 ? `⚠️ Acertou ${numAcertos} numero(s)` : '❌ Nao foi desta vez');
+            const statusText = ganhou ? '🎉 GANHADOR!' : (numAcertos > 0 ? `⚠️ Acertou ${numAcertos}` : '❌ Nao foi desta vez');
 
             let html = `
                 <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid ${statusColor};">
@@ -847,7 +865,7 @@ function verificarRecibo() {
                             }).join('')}
                         </div>
                     </div>
-                    <p><strong>Acertos:</strong> ${numAcertos} de ${aposta.chance} necessarios</p>
+                    <p><strong>Acertos:</strong> ${numAcertos} de ${aposta.chance}</p>
             `;
 
             if (ganhou) {
@@ -861,7 +879,7 @@ function verificarRecibo() {
                 if (!aposta.pago) {
                     html += `
                         <button onclick="pagarPremio('${aposta.id}', ${premio})" style="width: 100%; padding: 12px; background: #00ff88; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;">
-                            💰 CONFIRMAR PAGAMENTO DO PREMIO
+                            💰 CONFIRMAR PAGAMENTO
                         </button>
                     `;
                 } else {
@@ -876,7 +894,7 @@ function verificarRecibo() {
 }
 
 function pagarPremio(idRecibo, valor) {
-    if (!confirm(`Confirmar pagamento de ${valor.toFixed(2)} MTN para o recibo ${idRecibo}?`)) {
+    if (!confirm(`Confirmar pagamento de ${valor.toFixed(2)} MTN?`)) {
         return;
     }
 
@@ -892,10 +910,10 @@ function pagarPremio(idRecibo, valor) {
             }
         });
 
-        alert(`✅ Premio de ${valor.toFixed(2)} MTN pago com sucesso!`);
+        alert(`✅ Premio de ${valor.toFixed(2)} MTN pago!`);
         verificarRecibo();
     }).catch(err => {
-        alert('Erro ao processar pagamento: ' + err.message);
+        alert('Erro: ' + err.message);
     });
 }
 

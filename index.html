@@ -3,720 +3,494 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MozLottoGanha - Lotaria Online</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <title>MOZLOTTOGANHA - Sistema de Lotaria & P.O.S</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ============================================
+           ESTILOS GERAIS DA INTERFACE (Tema Escuro)
+           ============================================ */
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-card: #16162a;
+            --accent: #00ff88;
+            --accent-urgent: #ff4a4a;
+            --text: #ffffff;
+            --text-muted: #8b8baf;
+        }
+
         body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             min-height: 100vh;
-            color: #fff;
             overflow-x: hidden;
         }
 
-        /* Partículas animadas */
-        .particles {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 0; overflow: hidden;
-        }
-        .particle {
-            position: absolute; width: 4px; height: 4px;
-            background: rgba(255,215,0,0.6); border-radius: 50%;
-            animation: float 15s infinite;
-        }
-        @keyframes float {
-            0%,100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-10vh) rotate(720deg); opacity: 0; }
+        #particles {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            pointer-events: none;
         }
 
-        /* Header */
-        .header {
-            background: linear-gradient(90deg, #d4a017, #f4c430, #d4a017);
-            padding: 15px 20px;
-            display: flex; align-items: center; justify-content: space-between;
-            position: relative; z-index: 10;
-            box-shadow: 0 4px 20px rgba(212,160,23,0.4);
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            z-index: 1;
         }
-        .logo-area { display: flex; align-items: center; gap: 12px; }
-        .logo-icon {
-            width: 50px; height: 50px; background: #1a1a2e;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 24px; border: 3px solid #fff;
-        }
-        .logo-text h1 { font-size: 22px; font-weight: 900; color: #1a1a2e; text-shadow: 1px 1px 2px rgba(255,255,255,0.3); }
-        .logo-text span { font-size: 11px; color: #333; font-weight: 600; }
-        .header-right { display: flex; align-items: center; gap: 15px; }
-        .jackpot-display {
-            background: #1a1a2e; padding: 8px 20px; border-radius: 25px;
-            border: 2px solid #f4c430; text-align: center;
-        }
-        .jackpot-display .label { font-size: 10px; color: #f4c430; text-transform: uppercase; letter-spacing: 2px; }
-        .jackpot-display .amount { font-size: 20px; font-weight: 800; color: #fff; }
 
-        /* Main Container */
-        .main-container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; z-index: 5; }
-
-        /* Sorteios Grid */
-        .sorteios-section { margin-bottom: 30px; }
-        .section-title {
-            text-align: center; font-size: 24px; font-weight: 700;
-            margin-bottom: 20px; color: #f4c430;
-            text-shadow: 0 2px 10px rgba(244,196,48,0.3);
+        header {
+            text-align: center;
+            margin-bottom: 30px;
         }
-        .sorteios-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+
+        header h1 {
+            color: var(--accent);
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin: 5px 0 0 0;
+        }
+
+        h2 {
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
+            font-size: 1.4rem;
+            margin-top: 30px;
+        }
+
+        /* Grid de Sorteios */
+        .sorteos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 15px;
+            margin-bottom: 30px;
         }
+
         .sorteio-card {
-            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-            border: 1px solid rgba(244,196,48,0.3); border-radius: 16px;
-            padding: 18px; cursor: pointer; transition: all 0.3s ease;
-            position: relative; overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid #252545;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
         }
-        .sorteio-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(244,196,48,0.2); border-color: #f4c430; }
-        .sorteio-card.active { border-color: #00ff88; box-shadow: 0 0 20px rgba(0,255,136,0.3); }
-        .sorteio-card.closed { opacity: 0.5; pointer-events: none; border-color: #ff4444; }
-        .sorteio-card.winner { border-color: #00ff88; animation: winnerPulse 2s infinite; }
-        @keyframes winnerPulse {
-            0%,100% { box-shadow: 0 0 10px rgba(0,255,136,0.3); }
-            50% { box-shadow: 0 0 30px rgba(0,255,136,0.6); }
+
+        .sorteio-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.1);
         }
-        .sorteio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .sorteio-name { font-size: 14px; font-weight: 700; color: #f4c430; }
-        .sorteio-time { font-size: 18px; font-weight: 800; color: #fff; }
+
+        .sorteio-card.active {
+            border-color: var(--accent);
+            background: #1a2636;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+        }
+
+        .sorteio-card.closed {
+            opacity: 0.6;
+            border-color: #ff4a4a;
+        }
+
+        .sorteio-card.winner {
+            border-color: #f4c430;
+            background: #242015;
+        }
+
+        .sorteio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .sorteio-name {
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .sorteio-time {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
         .sorteio-status {
-            display: inline-block; padding: 3px 10px; border-radius: 12px;
-            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
         }
-        .status-open { background: #00ff88; color: #1a1a2e; }
-        .status-closed { background: #ff4444; color: #fff; }
-        .status-next { background: #f4c430; color: #1a1a2e; }
-        .sorteio-balls { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+        .status-open { background: rgba(0, 255, 136, 0.2); color: var(--accent); }
+        .status-closed { background: rgba(255, 74, 74, 0.2); color: var(--accent-urgent); }
+        .status-next { background: rgba(244, 196, 48, 0.2); color: #f4c430; }
+
+        .sorteio-balls {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+            min-height: 30px;
+            align-items: center;
+        }
+
         .ball {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 800; color: #1a1a2e;
-            box-shadow: 0 2px 8px rgba(244,196,48,0.4);
-            animation: ballPop 0.5s ease;
+            width: 28px;
+            height: 28px;
+            background: #f4c430;
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85rem;
+            animation: popIn 0.3s ease forwards;
         }
-        @keyframes ballPop {
-            0% { transform: scale(0); }
-            80% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
+
         .ball-placeholder {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: rgba(255,255,255,0.1); border: 2px dashed rgba(244,196,48,0.3);
+            width: 26px;
+            height: 26px;
+            border: 1px dashed #3d3d66;
+            border-radius: 50%;
         }
-        .countdown { font-size: 12px; color: #aaa; margin-top: 8px; text-align: center; }
-        .countdown.urgent { color: #ff6b6b; font-weight: 700; animation: blink 1s infinite; }
-        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        /* Apostar Section */
-        .apostar-section {
-            background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-            border: 1px solid rgba(244,196,48,0.2); border-radius: 20px;
-            padding: 25px; margin-bottom: 30px;
+        .countdown {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: right;
         }
-        .apostar-header { text-align: center; margin-bottom: 20px; }
-        .apostar-header h2 { font-size: 22px; color: #f4c430; margin-bottom: 5px; }
-        .apostar-header p { font-size: 13px; color: #aaa; }
 
-        /* Chance Selector */
-        .chance-selector {
-            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+        .countdown.urgent {
+            color: var(--accent-urgent);
+            font-weight: bold;
+            animation: pulse 1s infinite;
         }
+
+        /* Seletor de Chance */
+        .chance-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
         .chance-btn {
-            padding: 12px 24px; border: 2px solid rgba(244,196,48,0.4);
-            background: rgba(255,255,255,0.05); color: #fff;
-            border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600;
-            transition: all 0.3s; position: relative; overflow: hidden;
+            flex: 1;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid #252545;
+            color: var(--text);
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-        .chance-btn:hover { border-color: #f4c430; background: rgba(244,196,48,0.1); }
+
         .chance-btn.selected {
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            color: #1a1a2e; border-color: #f4c430;
-            box-shadow: 0 4px 15px rgba(244,196,48,0.4);
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
         }
-        .chance-btn .price { display: block; font-size: 11px; opacity: 0.8; margin-top: 2px; }
 
-        /* Number Grid */
+        /* Grelha Numérica (90 Números) */
         .numbers-grid {
-            display: grid; grid-template-columns: repeat(10, 1fr);
-            gap: 8px; max-width: 500px; margin: 0 auto 20px;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 6px;
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #252545;
         }
+
+        @media (max-width: 600px) {
+            .numbers-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+
         .num-btn {
-            aspect-ratio: 1; border: 2px solid rgba(255,255,255,0.2);
-            background: rgba(255,255,255,0.05); color: #fff;
-            border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 700;
-            transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+            aspect-ratio: 1;
+            background: #1f1f3a;
+            border: 1px solid #2f2f54;
+            color: var(--text);
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 1rem;
         }
-        .num-btn:hover { border-color: #f4c430; background: rgba(244,196,48,0.1); transform: scale(1.1); }
+
+        .num-btn:hover:not(.disabled) {
+            border-color: var(--accent);
+            background: #2a2a4e;
+        }
+
         .num-btn.selected {
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            color: #1a1a2e; border-color: #f4c430;
-            box-shadow: 0 0 15px rgba(244,196,48,0.5);
-            animation: selectPulse 0.3s ease;
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
         }
-        @keyframes selectPulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        .num-btn.disabled { opacity: 0.3; pointer-events: none; }
 
-        /* Selected Numbers Display */
-        .selected-display {
-            text-align: center; margin-bottom: 20px; padding: 15px;
-            background: rgba(0,0,0,0.3); border-radius: 12px;
+        .num-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
-        .selected-display h3 { font-size: 14px; color: #aaa; margin-bottom: 10px; }
-        .selected-balls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+        /* Painel de Controlo da Aposta */
+        .bet-control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #16162a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #252545;
+        }
+
+        .selected-balls-display {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
         .selected-ball {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 16px; font-weight: 800; color: #1a1a2e;
-            box-shadow: 0 3px 10px rgba(244,196,48,0.4);
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
 
-        /* Sorteio Selecionado */
-        .sorteio-selecionado {
-            text-align: center; margin-bottom: 15px;
-            padding: 12px; background: rgba(244,196,48,0.1);
-            border-radius: 10px; border: 1px solid rgba(244,196,48,0.3);
+        .action-btns button {
+            padding: 12px 24px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            margin-left: 10px;
         }
-        .sorteio-selecionado span { color: #f4c430; font-weight: 700; }
 
-        /* Action Buttons */
-        .action-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        .btn {
-            padding: 14px 35px; border: none; border-radius: 12px;
-            font-size: 15px; font-weight: 700; cursor: pointer;
-            transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px;
+        #btnApostar {
+            background: var(--accent);
+            color: #000;
         }
-        .btn-primary {
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            color: #1a1a2e; box-shadow: 0 4px 15px rgba(244,196,48,0.4);
-        }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(244,196,48,0.6); }
-        .btn-secondary {
-            background: rgba(255,255,255,0.1); color: #fff;
-            border: 2px solid rgba(255,255,255,0.2);
-        }
-        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 
-        /* Prémios Section */
-        .premios-section {
-            background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-            border: 1px solid rgba(244,196,48,0.2); border-radius: 20px;
-            padding: 25px; margin-bottom: 30px;
+        #btnApostar:disabled {
+            background: #3d3d5c;
+            color: #8b8baf;
+            cursor: not-allowed;
         }
-        .premios-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        .premio-card {
-            background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px;
-            border-left: 4px solid #f4c430;
-        }
-        .premio-card h4 { font-size: 14px; color: #f4c430; margin-bottom: 8px; }
-        .premio-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .premio-item:last-child { border-bottom: none; }
-        .premio-item .acertos { color: #aaa; }
-        .premio-item .valor { color: #00ff88; font-weight: 700; }
 
-        /* Recibos Section */
-        .recibos-section {
-            background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-            border: 1px solid rgba(244,196,48,0.2); border-radius: 20px;
-            padding: 25px; margin-bottom: 30px;
+        .btn-clear {
+            background: #ff4a4a;
+            color: white;
         }
-        .recibos-list { max-height: 400px; overflow-y: auto; }
-        .recibo-item {
-            background: rgba(0,0,0,0.3); border-radius: 10px; padding: 12px 15px;
-            margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
-            border-left: 3px solid #f4c430; transition: all 0.3s;
-        }
-        .recibo-item:hover { background: rgba(0,0,0,0.5); }
-        .recibo-info { flex: 1; }
-        .recibo-info .recibo-num { font-size: 12px; color: #f4c430; font-weight: 600; }
-        .recibo-info .recibo-detail { font-size: 11px; color: #aaa; }
-        .recibo-status {
-            padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-        }
-        .status-pendente { background: #f4c430; color: #1a1a2e; }
-        .status-ganhou { background: #00ff88; color: #1a1a2e; }
-        .status-perdeu { background: #ff4444; color: #fff; }
-        .status-pago { background: #4a90d9; color: #fff; }
 
-        /* Modal */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center;
-            z-index: 1000; padding: 20px;
+        /* Verificador de Bilhetes */
+        .verifier-box {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #252545;
+            margin-top: 20px;
         }
-        .modal-overlay.active { display: flex; }
+
+        .verifier-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .verifier-input-group input {
+            flex: 1;
+            padding: 12px;
+            background: #1f1f3a;
+            border: 1px solid #2f2f54;
+            color: white;
+            border-radius: 6px;
+            font-size: 1rem;
+            text-transform: uppercase;
+        }
+
+        .verifier-input-group button {
+            padding: 12px 24px;
+            background: #4a4aff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #verificarResult {
+            margin-top: 15px;
+        }
+
+        /* Modais */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
         .modal-content {
-            background: linear-gradient(145deg, #1a1a2e, #16213e);
-            border: 2px solid #f4c430; border-radius: 20px;
-            padding: 30px; max-width: 500px; width: 100%;
-            max-height: 90vh; overflow-y: auto;
-            animation: modalIn 0.3s ease;
-        }
-        @keyframes modalIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .modal-header { text-align: center; margin-bottom: 20px; }
-        .modal-header h2 { color: #f4c430; font-size: 22px; }
-        .modal-close {
-            position: absolute; top: 15px; right: 20px;
-            background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;
+            background: #1f1f3a;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #3d3d66;
+            max-width: 340px;
+            width: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        /* Recibo POS */
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .modal-actions button {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-blue { background: #00a2ff; color: #fff; }
+        .btn-green { background: #00ff88; color: #000; }
+        .btn-close { background: #3d3d5c; color: #fff; }
+
+        /* ============================================
+           ESTILOS DO RECIBO DENTRO DO MODAL (TELA)
+           ============================================ */
         .pos-recibo {
-            background: #fff; color: #1a1a2e; padding: 18px;
-            border-radius: 2px; font-family: 'Courier New', monospace;
-            border: 1px solid #bbb; max-width: 300px; margin: 0 auto;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-        .pos-header { text-align: center; padding-bottom: 6px; margin-bottom: 6px; }
-        .pos-header h3 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: 2px; }
-        .pos-header .sub { font-size: 10px; color: #666; margin: 1px 0; }
-        .pos-divider {
-            border: none; border-top: 1px dashed #999;
-            margin: 5px 0;
-        }
-        .pos-divider-double {
-            border: none; border-top: 2px solid #333;
-            margin: 5px 0;
-        }
-        .pos-section-title {
-            text-align: center; font-size: 10px; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin: 3px 0; color: #333;
-        }
-        .pos-line { 
-            display: flex; justify-content: space-between; 
-            padding: 2px 0; font-size: 11px; 
-        }
-        .pos-line .label { color: #555; }
-        .pos-line .value { font-weight: 700; color: #1a1a2e; }
-        .pos-line.center { justify-content: center; text-align: center; }
-        .pos-line.bold { font-weight: 700; font-size: 12px; }
-        .pos-line.big { font-size: 14px; }
-        .pos-line.big .value { font-size: 16px; color: #b8860b; }
-
-        .pos-balls-row {
-            display: flex; gap: 6px; justify-content: center; 
-            margin: 8px 0; flex-wrap: wrap; padding: 6px 0;
-        }
-        .pos-ball {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            border: 2px solid #8B6914;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 900; color: #1a1a2e;
+            width: 280px;
+            background: #fff;
+            color: #000;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.3;
+            margin: 0 auto;
+            border: 1px dashed #777;
         }
 
-        .pos-barcode-area {
-            text-align: center; margin: 8px 0; padding: 6px;
-            background: #f0f0f0; border-radius: 2px;
-        }
-        .pos-barcode {
-            font-size: 12px; letter-spacing: 1px;
-            font-family: monospace; font-weight: 700;
-            color: #333;
-        }
-        .pos-barcode-lines {
-            font-size: 20px; line-height: 1;
-            letter-spacing: 0; color: #333;
-            margin: 3px 0;
-        }
+        .pos-header { text-align: center; }
+        .pos-header h3 { font-size: 16px; margin: 0 0 4px 0; font-weight: bold; }
+        .pos-header .sub { font-size: 10px; margin: 2px 0; font-weight: bold; }
+        .pos-divider { text-align: center; margin: 5px 0; font-weight: bold; }
+        .pos-section-title { text-align: center; font-size: 10px; font-weight: bold; margin: 6px 0; text-decoration: underline; }
+        .pos-line { display: flex; justify-content: space-between; padding: 2px 0; }
+        .pos-line.center { justify-content: center; }
+        .pos-line.bold { font-weight: bold; font-size: 14px; }
+        .pos-line.big { font-size: 15px; font-weight: bold; }
+        .pos-balls-row { display: flex; gap: 5px; justify-content: center; margin: 8px 0; }
+        .pos-ball { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; background: #fff; }
+        .pos-valor-box { border: 2px solid #000; padding: 6px; text-align: center; margin: 8px 0; }
+        .pos-valor-box .label { font-size: 10px; font-weight: bold; }
+        .pos-valor-box .valor { font-size: 18px; font-weight: bold; }
+        .pos-barcode-area { text-align: center; margin: 8px 0; }
+        .pos-barcode-lines { font-size: 14px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
+        .pos-barcode { font-size: 9px; font-weight: bold; }
+        .pos-footer { text-align: center; font-size: 9px; margin-top: 8px; }
+        .pos-footer p { margin: 2px 0; }
 
-        .pos-footer { 
-            text-align: center; margin-top: 6px; 
-            font-size: 9px; color: #666; padding-top: 6px; 
-        }
-        .pos-footer p { margin: 1px 0; }
-        .pos-stars { font-size: 12px; letter-spacing: 2px; margin: 3px 0; text-align: center; }
-
-        .pos-valor-box {
-            background: #1a1a2e; color: #f4c430;
-            padding: 6px 12px; border-radius: 4px;
-            text-align: center; margin: 6px 0;
-        }
-        .pos-valor-box .label { font-size: 9px; text-transform: uppercase; }
-        .pos-valor-box .valor { font-size: 18px; font-weight: 900; }
-
-        /* Print Section */
-        .print-btns { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
-        .print-btn {
-            padding: 10px 20px; border: none; border-radius: 8px;
-            font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s;
-        }
-        .print-bluetooth { background: #0082fc; color: #fff; }
-        .print-screen { background: #f4c430; color: #1a1a2e; }
-
-        /* Admin Panel */
-        .admin-toggle {
-            position: fixed; bottom: 20px; right: 20px;
-            width: 50px; height: 50px; border-radius: 50%;
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            border: none; color: #1a1a2e; font-size: 20px;
-            cursor: pointer; z-index: 100; box-shadow: 0 4px 15px rgba(244,196,48,0.4);
-            transition: all 0.3s;
-        }
-        .admin-toggle:hover { transform: scale(1.1); }
-
-        .admin-panel {
-            position: fixed; top: 0; right: -400px; width: 400px; height: 100%;
-            background: linear-gradient(180deg, #1a1a2e, #0f3460);
-            z-index: 200; transition: right 0.3s ease;
-            padding: 20px; overflow-y: auto;
-            border-left: 3px solid #f4c430;
-        }
-        .admin-panel.open { right: 0; }
-        .admin-panel h2 { color: #f4c430; margin-bottom: 20px; font-size: 20px; }
-        .admin-section { margin-bottom: 25px; }
-        .admin-section h3 { font-size: 14px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; }
-        .admin-stat {
-            background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px;
-            margin-bottom: 8px; display: flex; justify-content: space-between;
-        }
-        .admin-stat .label { font-size: 12px; color: #aaa; }
-        .admin-stat .value { font-size: 14px; font-weight: 700; color: #f4c430; }
-        .admin-input {
-            width: 100%; padding: 10px; border-radius: 8px;
-            border: 1px solid rgba(244,196,48,0.3); background: rgba(0,0,0,0.3);
-            color: #fff; font-size: 13px; margin-bottom: 8px;
-        }
-        .admin-input:focus { outline: none; border-color: #f4c430; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        ::-webkit-scrollbar-thumb { background: #f4c430; border-radius: 3px; }
-
-        /* Toast */
-        .toast {
-            position: fixed; top: 80px; right: 20px;
-            padding: 15px 25px; border-radius: 10px;
-            font-size: 14px; font-weight: 600; z-index: 1001;
-            transform: translateX(400px); transition: transform 0.3s ease;
-            max-width: 350px;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast-success { background: #00ff88; color: #1a1a2e; }
-        .toast-error { background: #ff4444; color: #fff; }
-        .toast-info { background: #f4c430; color: #1a1a2e; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .numbers-grid { grid-template-columns: repeat(9, 1fr); gap: 5px; }
-            .num-btn { font-size: 12px; }
-            .sorteios-grid { grid-template-columns: 1fr; }
-            .admin-panel { width: 100%; right: -100%; }
-            .header { flex-wrap: wrap; gap: 10px; }
-            .jackpot-display { padding: 6px 12px; }
-            .jackpot-display .amount { font-size: 16px; }
-        }
-
-        /* Confetti */
-        .confetti-container {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 999; overflow: hidden;
-        }
-        .confetti {
-            position: absolute; width: 10px; height: 10px;
-            animation: confettiFall 3s ease-out forwards;
-        }
-        @keyframes confettiFall {
-            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
-        }
-
-        /* Loading Spinner */
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(244,196,48,0.2);
-            border-top-color: #f4c430; border-radius: 50%;
-            animation: spin 1s linear infinite; margin: 20px auto;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Sorteio Animation Overlay */
-        .sorteio-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 500;
-            display: none; align-items: center; justify-content: center; flex-direction: column;
-        }
-        .sorteio-overlay.active { display: flex; }
-        .sorteio-overlay h2 { font-size: 32px; color: #f4c430; margin-bottom: 30px; text-align: center; }
-        .sorteio-balls-anim { display: flex; gap: 20px; margin-bottom: 30px; }
-        .anim-ball {
-            width: 80px; height: 80px; border-radius: 50%;
-            background: linear-gradient(145deg, #f4c430, #d4a017);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px; font-weight: 900; color: #1a1a2e;
-            box-shadow: 0 0 30px rgba(244,196,48,0.5);
-            animation: ballBounce 0.5s ease infinite alternate;
-        }
-        .anim-ball:nth-child(2) { animation-delay: 0.1s; }
-        .anim-ball:nth-child(3) { animation-delay: 0.2s; }
-        .anim-ball:nth-child(4) { animation-delay: 0.3s; }
-        .anim-ball:nth-child(5) { animation-delay: 0.4s; }
-        @keyframes ballBounce {
-            from { transform: translateY(0); }
-            to { transform: translateY(-20px); }
-        }
-
-        /* Tabs */
-        .tabs { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid rgba(244,196,48,0.2); }
-        .tab {
-            padding: 10px 20px; background: none; border: none;
-            color: #aaa; font-size: 13px; font-weight: 600; cursor: pointer;
-            border-bottom: 3px solid transparent; transition: all 0.3s;
-        }
-        .tab:hover { color: #f4c430; }
-        .tab.active { color: #f4c430; border-bottom-color: #f4c430; }
-
-        /* Verificar Recibo */
-        .verificar-section {
-            background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px;
-            margin-bottom: 20px; text-align: center;
-        }
-        .verificar-section input {
-            padding: 12px 20px; border-radius: 10px; border: 2px solid rgba(244,196,48,0.3);
-            background: rgba(0,0,0,0.3); color: #fff; font-size: 14px; width: 250px;
-            margin-right: 10px;
-        }
-        .verificar-section input:focus { outline: none; border-color: #f4c430; }
+        /* Animações */
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
-<base target="_blank">
 </head>
 <body>
-    <div class="particles" id="particles"></div>
 
-    <!-- Header -->
-    <header class="header">
-        <div class="logo-area">
-            <div class="logo-icon">🎱</div>
-            <div class="logo-text">
-                <h1>MozLottoGanha</h1>
-                <span>A sua sorte em cada bola</span>
+    <div id="particles"></div>
+
+    <div class="container">
+        <header>
+            <h1>MOZLOTTOGANHA</h1>
+            <p>Painel Operacional de Vendas & Emissão P.O.S</p>
+        </header>
+
+        <h2>1. Selecione o Sorteio Ativo</h2>
+        <div id="sorteosGrid" class="sorteos-grid">
+            </div>
+
+        <h2>2. Configurar Bilhete</h2>
+        <div class="chance-container">
+            <button class="chance-btn selected" data-chance="5" onclick="selectChance(5)">CHANCE 5</button>
+            <button class="chance-btn" data-chance="4" onclick="selectChance(4)">CHANCE 4</button>
+            <button class="chance-btn" data-chance="3" onclick="selectChance(3)">CHANCE 3</button>
+            <button class="chance-btn" data-chance="2" onclick="selectChance(2)">CHANCE 2</button>
+        </div>
+
+        <div id="numbersGrid" class="numbers-grid">
+            </div>
+
+        <div class="bet-control-panel">
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Selecionados (<span id="selectedCount">0</span>/<span id="maxSelect">5</span>):</span>
+                <div id="selectedBalls" class="selected-balls-display" style="margin-top: 5px;">
+                    </div>
+            </div>
+            <div>
+                <span style="color: var(--text-muted); font-size: 0.9rem; display: block; text-align: right;">Sorteio Alvo: <strong id="sorteioNome" style="color:#fff;">Nenhum</strong> (<span id="sorteioHora">--:--</span>)</span>
+                <div class="action-btns" style="margin-top: 5px;">
+                    <button class="btn-clear" onclick="clearSelection()">Limpar</button>
+                    <button id="btnApostar" disabled onclick="fazerAposta()">REGISTAR APOSTA</button>
+                </div>
             </div>
         </div>
-        <div class="header-right">
-            <div class="jackpot-display">
-                <div class="label">Jackpot Acumulado</div>
-                <div class="amount" id="jackpotAmount">0 MTN</div>
+
+        <h2>3. Validar e Pagar Prémios</h2>
+        <div class="verifier-box">
+            <div class="verifier-input-group">
+                <input type="text" id="verificarInput" placeholder="Insira o ID do Recibo (Ex: MLG...)">
+                <button onclick="verificarRecibo()">Verificar Estado</button>
             </div>
+            <div id="verificarResult">
+                </div>
         </div>
-    </header>
-
-    <div class="main-container">
-        <!-- Sorteios -->
-        <section class="sorteios-section">
-            <h2 class="section-title">🎯 Sorteios do Dia</h2>
-            <div class="sorteios-grid" id="sorteiosGrid"></div>
-        </section>
-
-        <!-- Apostar -->
-        <section class="apostar-section" id="apostarSection">
-            <div class="apostar-header">
-                <h2>🎲 Fazer Aposta</h2>
-                <p>Escolha o tipo de chance, o sorteio e os seus números da sorte</p>
-            </div>
-
-            <div class="sorteio-selecionado" id="sorteioSelecionado">
-                Sorteio selecionado: <span id="sorteioNome">Nenhum</span> às <span id="sorteioHora">--:--</span>
-            </div>
-
-            <div class="chance-selector" id="chanceSelector">
-                <button class="chance-btn selected" data-chance="5" onclick="selectChance(5)">
-                    Chance 5
-                    <span class="price">5 MTN</span>
-                </button>
-                <button class="chance-btn" data-chance="4" onclick="selectChance(4)">
-                    Chance 4
-                    <span class="price">5 MTN</span>
-                </button>
-                <button class="chance-btn" data-chance="3" onclick="selectChance(3)">
-                    Chance 3
-                    <span class="price">5 MTN</span>
-                </button>
-                <button class="chance-btn" data-chance="2" onclick="selectChance(2)">
-                    Chance 2
-                    <span class="price">5 MTN</span>
-                </button>
-            </div>
-
-            <div class="selected-display">
-                <h3>Números Selecionados (<span id="selectedCount">0</span>/<span id="maxSelect">5</span>)</h3>
-                <div class="selected-balls" id="selectedBalls"></div>
-            </div>
-
-            <div class="numbers-grid" id="numbersGrid"></div>
-
-            <div class="action-btns">
-                <button class="btn btn-secondary" onclick="clearSelection()">🗑️ Limpar</button>
-                <button class="btn btn-primary" id="btnApostar" onclick="fazerAposta()" disabled>
-                    💰 Apostar 5 MTN
-                </button>
-            </div>
-        </section>
-
-        <!-- Verificar Recibo -->
-        <section class="recibos-section">
-            <h2 class="section-title">🔍 Verificar Recibo</h2>
-            <div class="verificar-section">
-                <input type="text" id="verificarInput" placeholder="Digite o número do recibo..." maxlength="20" style="text-transform:uppercase;">
-                <button class="btn btn-primary" onclick="verificarRecibo()">Verificar</button>
-            </div>
-            <div id="verificarResult"></div>
-        </section>
-
-        <!-- Prémios -->
-        <section class="premios-section">
-            <h2 class="section-title">🏆 Tabela de Prémios</h2>
-            <div class="tabs">
-                <button class="tab active" onclick="showPremiosTab(5)">Chance 5</button>
-                <button class="tab" onclick="showPremiosTab(4)">Chance 4</button>
-                <button class="tab" onclick="showPremiosTab(3)">Chance 3</button>
-                <button class="tab" onclick="showPremiosTab(2)">Chance 2</button>
-            </div>
-            <div class="premios-grid" id="premiosGrid"></div>
-        </section>
-
-        <!-- Meus Recibos -->
-        <section class="recibos-section">
-            <h2 class="section-title">📋 Meus Recibos</h2>
-            <div class="recibos-list" id="recibosList">
-                <p style="text-align:center; color:#aaa; padding:20px;">Nenhuma aposta realizada ainda</p>
-            </div>
-        </section>
     </div>
 
-    <!-- Modal Recibo -->
-    <div class="modal-overlay" id="modalRecibo">
+    <div id="modalRecibo" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>🎫 Recibo da Aposta</h2>
-            </div>
-            <div id="reciboContent"></div>
-            <div class="print-btns">
-                <button class="print-btn print-bluetooth" onclick="printBluetooth()">
-                    <i class="fas fa-bluetooth-b"></i> Imprimir Bluetooth
-                </button>
-                <button class="print-btn print-screen" onclick="printScreen()">
-                    <i class="fas fa-print"></i> Imprimir Tela
-                </button>
-            </div>
-            <div style="text-align:center; margin-top:15px;">
-                <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
+            <div id="reciboContent">
+                </div>
+            <div class="modal-actions">
+                <button class="btn-green" onclick="printBluetooth()">IMPRIMIR IMPRESSORA BLUETOOTH</button>
+                <button class="btn-blue" onclick="printScreen()">IMPRIMIR VIA NAVEGADOR (P.O.S)</button>
+                <button class="btn-close" onclick="closeModal()">CONCLUIR / FECHAR</button>
             </div>
         </div>
     </div>
-
-    <!-- Sorteio Animation Overlay -->
-    <div class="sorteio-overlay" id="sorteioOverlay">
-        <h2 id="sorteioOverlayTitle">🎱 Sorteio em Andamento</h2>
-        <div class="sorteio-balls-anim" id="sorteioBallsAnim">
-            <div class="anim-ball">?</div>
-            <div class="anim-ball">?</div>
-            <div class="anim-ball">?</div>
-            <div class="anim-ball">?</div>
-            <div class="anim-ball">?</div>
-        </div>
-        <p style="color:#f4c430; font-size:18px;" id="sorteioOverlayText">Sorteando números...</p>
-    </div>
-
-    <!-- Admin Toggle -->
-    <button class="admin-toggle" onclick="toggleAdmin()" title="Painel Admin">
-        <i class="fas fa-cog"></i>
-    </button>
-
-    <!-- Admin Panel -->
-    <div class="admin-panel" id="adminPanel">
-        <h2>⚙️ Painel Administrativo</h2>
-
-        <div class="admin-section">
-            <h3>Estatísticas Gerais</h3>
-            <div class="admin-stat">
-                <span class="label">Total Apostas Hoje</span>
-                <span class="value" id="adminTotalApostas">0</span>
-            </div>
-            <div class="admin-stat">
-                <span class="label">Valor Acumulado</span>
-                <span class="value" id="adminValorTotal">0 MTN</span>
-            </div>
-            <div class="admin-stat">
-                <span class="label">Prémios Pagos</span>
-                <span class="value" id="adminPremiosPagos">0 MTN</span>
-            </div>
-            <div class="admin-stat">
-                <span class="label">Bilhetes Perdidos</span>
-                <span class="value" id="adminBilhetesPerdidos">0</span>
-            </div>
-        </div>
-
-        <div class="admin-section">
-            <h3>Sorteio Manual</h3>
-            <select class="admin-input" id="adminSorteioSelect">
-                <option value="">Selecione o sorteio...</option>
-            </select>
-            <button class="btn btn-primary" style="width:100%;" onclick="realizarSorteioManual()">
-                🎱 Realizar Sorteio Manual
-            </button>
-        </div>
-
-        <div class="admin-section">
-            <h3>Pagamento de Prémios</h3>
-            <input type="text" class="admin-input" id="adminReciboInput" placeholder="Número do recibo">
-            <button class="btn btn-primary" style="width:100%;" onclick="pagarPremio()">
-                💰 Marcar como Pago
-            </button>
-        </div>
-
-        <div class="admin-section">
-            <h3>Apostas do Sorteio</h3>
-            <select class="admin-input" id="adminVerApostasSelect">
-                <option value="">Selecione o sorteio...</option>
-            </select>
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="verApostasSorteio()">
-                📋 Ver Apostas
-            </button>
-            <div id="adminApostasList" style="max-height:300px; overflow-y:auto;"></div>
-        </div>
-
-        <div class="admin-section">
-            <h3>Configurações</h3>
-            <div class="admin-stat">
-                <span class="label">Percentual de Pagamento</span>
-                <span class="value">40%</span>
-            </div>
-            <div class="admin-stat">
-                <span class="label">Valor da Aposta</span>
-                <span class="value">5 MTN</span>
-            </div>
-        </div>
-
-        <button class="btn btn-secondary" style="width:100%; margin-top:20px;" onclick="toggleAdmin()">
-            Fechar Painel
-        </button>
-    </div>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
-    <!-- Confetti -->
-    <div class="confetti-container" id="confettiContainer"></div>
 
     <script src="app.js"></script>
 </body>

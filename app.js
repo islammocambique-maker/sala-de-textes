@@ -1,8 +1,9 @@
 // ============================================
-// MOZLOTTOGANHA - Sistema de Lotaria Online
+// MOZLOTTOGANHA - APP.JS COMPLETO
+// Sistema de Lotaria & P.O.S
 // ============================================
 
-// Firebase Config
+// --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyCW9ZZadm4WJ_FKtOjvkP1czsfImwzl98c",
     authDomain: "mozcoin.firebaseapp.com",
@@ -14,887 +15,720 @@ const firebaseConfig = {
     measurementId: "G-9KCS6TG1CZ"
 };
 
-// Inicializar Firebase (sem auth)
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ============================================
-// CONFIGURACOES
-// ============================================
-const SORTEIOS = [
-    { id: 'sorteio1', nome: 'Sorteio Manha Quente', hora: '08:00', horaMin: 480 },
-    { id: 'sorteio2', nome: 'Sorteio da Sorte', hora: '10:00', horaMin: 600 },
-    { id: 'sorteio3', nome: 'Sorteio Meio Dia', hora: '12:00', horaMin: 720 },
-    { id: 'sorteio4', nome: 'Sorteio do Lanche', hora: '14:00', horaMin: 840 },
-    { id: 'sorteio5', nome: 'Sorteio Por do Sol', hora: '16:00', horaMin: 960 },
-    { id: 'sorteio6', nome: 'Sorteio Ultimo Comboio', hora: '18:00', horaMin: 1080 },
-    { id: 'sorteio7', nome: 'Sorteio Boa Noite', hora: '20:00', horaMin: 1200 },
-    { id: 'sorteio8', nome: 'Sorteio da Despedida', hora: '22:00', horaMin: 1320 }
+// --- CONFIGURAÇÃO DOS SORTEIOS ---
+const SORTEOS_CONFIG = [
+    { id: 'sorteio1', nome: 'Sorteio da Manhã', hora: '09:00' },
+    { id: 'sorteio2', nome: 'Sorteio da Manhã 2', hora: '11:00' },
+    { id: 'sorteio3', nome: 'Sorteio do Meio-Dia', hora: '13:00' },
+    { id: 'sorteio4', nome: 'Sorteio da Tarde', hora: '15:00' },
+    { id: 'sorteio5', nome: 'Sorteio da Tarde 2', hora: '17:00' },
+    { id: 'sorteio6', nome: 'Sorteio da Noite', hora: '19:00' },
+    { id: 'sorteio7', nome: 'Sorteio da Noite 2', hora: '21:00' },
+    { id: 'sorteio8', nome: 'Sorteio da Meia-Noite', hora: '23:00' }
 ];
 
-const PREMIOS = {
-    5: [
-        { acertos: 5, premio: 500000 },
-        { acertos: 4, premio: 15000 },
-        { acertos: 3, premio: 500 },
-        { acertos: 2, premio: 50 },
-        { acertos: 1, premio: 5 }
-    ],
-    4: [
-        { acertos: 4, premio: 10000 },
-        { acertos: 3, premio: 500 },
-        { acertos: 2, premio: 100 },
-        { acertos: 1, premio: 10 }
-    ],
-    3: [
-        { acertos: 3, premio: 5000 },
-        { acertos: 2, premio: 50 },
-        { acertos: 1, premio: 5 }
-    ],
-    2: [
-        { acertos: 2, premio: 250 },
-        { acertos: 1, premio: 25 }
-    ]
+// --- ESTADO DA APLICAÇÃO ---
+let estado = {
+    sorteioSelecionado: null,
+    chanceSelecionada: 5,
+    numerosSelecionados: [],
+    sorteios: {},
+    timerInterval: null
 };
 
-const VALOR_APOSTA = 5;
-const PERCENTUAL_PAGAMENTO = 0.40;
-const MINUTOS_FECHAMENTO = 15;
+// --- INICIALIZAÇÃO ---
+document.addEventListener('DOMContentLoaded', () => {
+    initParticles();
+    initSorteios();
+    initNumbersGrid();
+    startTimer();
 
-// ============================================
-// ESTADO GLOBAL
-// ============================================
-let selectedChance = 5;
-let selectedNumbers = [];
-let selectedSorteio = null;
-let recibosLocal = JSON.parse(localStorage.getItem('mozlottoganha_recibos') || '[]');
-let bluetoothDevice = null;
-let bluetoothCharacteristic = null;
-let ultimoDiaVerificado = null;
-let resultadosCache = {};
-let reciboAtual = null; 
-
-// ============================================
-// INICIALIZACAO
-// ============================================
-document.addEventListener('DOMContentLoaded', async () => {
-    createParticles();
-    await carregarResultadosDoDia();
-    renderSorteios();
-    renderNumbersGrid();
-    renderPremiosTab(5);
-    renderRecibos();
-    updateJackpot();
-    startCountdowns();
-    populateAdminSelects();
-
-    ultimoDiaVerificado = new Date().getDate();
-
-    setInterval(verificarSorteiosPendentes, 60000);
-    setInterval(() => {
-        updateSorteiosStatus();
-        updateCountdowns();
-        verificarMudancaDeDia();
-    }, 1000);
-
-    verificarSorteiosPendentes();
+    // Listener em tempo real para resultados dos sorteios
+    db.ref('mozlotto/sorteios').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        estado.sorteios = data;
+        atualizarInterfaceSorteios();
+    });
 });
 
 // ============================================
-// CARREGAR RESULTADOS DO DIA
+// SISTEMA DE PARTÍCULAS (FUNDO ANIMADO)
 // ============================================
-async function carregarResultadosDoDia() {
-    try {
-        const dataHoje = new Date().toISOString().split('T')[0];
-        const snapshot = await db.ref('mozlottoganha/resultados').once('value');
-        const resultados = snapshot.val() || {};
+function initParticles() {
+    const canvas = document.createElement('canvas');
+    canvas.id = 'particleCanvas';
+    document.getElementById('particles').appendChild(canvas);
+    const ctx = canvas.getContext('2d');
 
-        resultadosCache = {};
-        for (const sorteioId in resultados) {
-            if (resultados[sorteioId][dataHoje]) {
-                resultadosCache[sorteioId] = resultados[sorteioId][dataHoje];
-            }
-        }
-    } catch (err) {
-        console.error('Erro ao carregar resultados:', err);
+    let particles = [];
+    const particleCount = 50;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
     }
+    resize();
+    window.addEventListener('resize', resize);
+
+    for (let i = 0; i < particleCount; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5,
+            size: Math.random() * 2 + 1,
+            opacity: Math.random() * 0.5 + 0.1
+        });
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0, 255, 136, ${p.opacity})`;
+            ctx.fill();
+        });
+
+        requestAnimationFrame(animate);
+    }
+    animate();
 }
 
 // ============================================
-// VERIFICAR MUDANCA DE DIA
+// SISTEMA DE SORTEIOS
 // ============================================
-function verificarMudancaDeDia() {
-    const agora = new Date();
-    const diaAtual = agora.getDate();
-
-    if (ultimoDiaVerificado !== null && diaAtual !== ultimoDiaVerificado) {
-        ultimoDiaVerificado = diaAtual;
-        resultadosCache = {};
-        renderSorteios();
-        updateJackpot();
-        renderRecibos();
-        selectedSorteio = null;
-        document.getElementById('sorteioNome').textContent = 'Nenhum';
-        document.getElementById('sorteioHora').textContent = '--:--';
-        showToast('NOVO DIA! Todos os sorteios estao abertos!', 'success');
-    }
-}
-
-// ============================================
-// PARTICULAS
-// ============================================
-function createParticles() {
-    const container = document.getElementById('particles');
-    if (!container) return;
-    container.innerHTML = '';
-    for (let i = 0; i < 30; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = Math.random() * 100 + '%';
-        p.style.animationDelay = Math.random() * 15 + 's';
-        p.style.animationDuration = (10 + Math.random() * 10) + 's';
-        container.appendChild(p);
-    }
-}
-
-// ============================================
-// SORTEIOS
-// ============================================
-function renderSorteios() {
+function initSorteios() {
     const grid = document.getElementById('sorteosGrid');
-    if (!grid) return;
-    const now = new Date();
-    const minutosAtual = now.getHours() * 60 + now.getMinutes();
+    grid.innerHTML = '';
 
-    grid.innerHTML = SORTEIOS.map(sorteio => {
-        const minutosSorteio = sorteio.horaMin;
-        const minutosAteSorteio = minutosSorteio - minutosAtual;
-        const estaAberto = minutosAteSorteio > MINUTOS_FECHAMENTO;
-        const jaPassou = minutosAteSorteio < 0;
+    SORTEOS_CONFIG.forEach(config => {
+        const card = document.createElement('div');
+        card.className = 'sorteio-card';
+        card.id = `card-${config.id}`;
+        card.onclick = () => selecionarSorteio(config.id);
 
-        const resultado = resultadosCache[sorteio.id];
-        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
-
-        let statusClass = '';
-        let statusText = '';
-        let statusClassBadge = '';
-
-        if (jaPassou) {
-            if (temResultado) {
-                statusClass = 'winner';
-                statusText = 'Realizado';
-                statusClassBadge = 'status-open';
-            } else {
-                statusClass = 'closed';
-                statusText = 'Encerrado';
-                statusClassBadge = 'status-closed';
-            }
-        } else if (!estaAberto) {
-            statusClass = 'closed';
-            statusText = 'Fechado';
-            statusClassBadge = 'status-closed';
-        } else if (minutosAteSorteio <= 30) {
-            statusClass = 'active';
-            statusText = 'Aberto - Urgente';
-            statusClassBadge = 'status-next';
-        } else {
-            statusClass = '';
-            statusText = 'Aberto';
-            statusClassBadge = 'status-open';
-        }
-
-        const isSelected = selectedSorteio && selectedSorteio.id === sorteio.id;
-        if (isSelected) statusClass += ' active';
-
-        let ballsHTML = '';
-        if (jaPassou && temResultado) {
-            ballsHTML = resultado.numeros.map((n, i) => 
-                `<div class="ball" style="animation-delay:${i * 0.2}s">${n}</div>`
-            ).join('');
-        } else if (jaPassou) {
-            ballsHTML = '<span style="color:#aaa;font-size:12px;">Aguardando resultado...</span>';
-        } else {
-            ballsHTML = Array(5).fill(0).map(() => '<div class="ball-placeholder"></div>').join('');
-        }
-
-        return `
-            <div class="sorteio-card ${statusClass}" id="card-${sorteio.id}" onclick="selectSorteio('${sorteio.id}')">
-                <div class="sorteio-header">
-                    <div>
-                        <div class="sorteio-name">${sorteio.nome}</div>
-                        <div class="sorteio-time">${sorteio.hora}h</div>
-                    </div>
-                    <span class="sorteio-status ${statusClassBadge}">${statusText}</span>
+        card.innerHTML = `
+            <div class="sorteio-header">
+                <div>
+                    <div class="sorteio-name">${config.nome}</div>
+                    <div class="sorteio-time">${config.hora}</div>
                 </div>
-                <div class="sorteio-balls" id="balls-${sorteio.id}">${ballsHTML}</div>
-                <div class="countdown ${minutosAteSorteio <= 30 && minutosAteSorteio > 0 ? 'urgent' : ''}" id="countdown-${sorteio.id}">
-                    ${jaPassou && temResultado ? `Numeros: ${resultado.numeros.join(', ')}` : 
-                      (jaPassou ? 'Sorteio realizado' : formatCountdown(minutosAteSorteio))}
-                </div>
+                <span class="sorteio-status status-next" id="status-${config.id}">AGUARDANDO</span>
             </div>
+            <div class="sorteio-balls" id="balls-${config.id}">
+                <div class="ball-placeholder"></div>
+                <div class="ball-placeholder"></div>
+                <div class="ball-placeholder"></div>
+                <div class="ball-placeholder"></div>
+                <div class="ball-placeholder"></div>
+            </div>
+            <div class="countdown" id="countdown-${config.id}">--:--:--</div>
         `;
-    }).join('');
+
+        grid.appendChild(card);
+    });
 }
 
-function selectSorteio(sorteioId) {
-    const sorteio = SORTEIOS.find(s => s.id === sorteioId);
-    const now = new Date();
-    const minutosAtual = now.getHours() * 60 + now.getMinutes();
-    const minutosAteSorteio = sorteio.horaMin - minutosAtual;
-
-    if (minutosAteSorteio <= MINUTOS_FECHAMENTO && minutosAteSorteio > 0) {
-        showToast('As apostas para este sorteio ja estao fechadas!', 'error');
-        return;
-    }
-    if (minutosAteSorteio <= 0) {
-        showToast('Este sorteio ja foi realizado!', 'error');
-        return;
-    }
-
-    selectedSorteio = sorteio;
+function selecionarSorteio(sorteioId) {
+    // Desselecionar anterior
     document.querySelectorAll('.sorteio-card').forEach(c => c.classList.remove('active'));
-    const selectedCard = document.getElementById(`card-${sorteioId}`);
-    if (selectedCard) selectedCard.classList.add('active');
-    
-    document.getElementById('sorteioNome').textContent = sorteio.nome;
-    document.getElementById('sorteioHora').textContent = sorteio.hora;
-    showToast(`Sorteio selecionado: ${sorteio.nome}`, 'info');
+
+    // Selecionar novo
+    const card = document.getElementById(`card-${sorteioId}`);
+    if (card.classList.contains('closed')) {
+        alert('Este sorteio já foi realizado! Selecione um sorteio aberto.');
+        return;
+    }
+
+    card.classList.add('active');
+    estado.sorteioSelecionado = sorteioId;
+
+    const config = SORTEOS_CONFIG.find(s => s.id === sorteioId);
+    document.getElementById('sorteioNome').textContent = config.nome;
+    document.getElementById('sorteioHora').textContent = config.hora;
+
+    atualizarBotaoApostar();
 }
 
-function updateSorteiosStatus() {
-    const now = new Date();
-    const minutosAtual = now.getHours() * 60 + now.getMinutes();
+function atualizarInterfaceSorteios() {
+    const agora = new Date();
 
-    SORTEIOS.forEach(sorteio => {
-        const minutosAteSorteio = sorteio.horaMin - minutosAtual;
-        const card = document.getElementById(`card-${sorteio.id}`);
-        if (!card) return;
+    SORTEOS_CONFIG.forEach(config => {
+        const [hora, minuto] = config.hora.split(':').map(Number);
+        const horaSorteio = new Date();
+        horaSorteio.setHours(hora, minuto, 0, 0);
 
-        const statusBadge = card.querySelector('.sorteio-status');
-        const resultado = resultadosCache[sorteio.id];
-        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
+        const card = document.getElementById(`card-${config.id}`);
+        const statusEl = document.getElementById(`status-${config.id}`);
+        const ballsEl = document.getElementById(`balls-${config.id}`);
+        const countdownEl = document.getElementById(`countdown-${config.id}`);
 
-        if (minutosAteSorteio <= 0) {
-            if (temResultado) {
-                card.className = 'sorteio-card winner';
-                if (statusBadge) {
-                    statusBadge.textContent = 'Realizado';
-                    statusBadge.className = 'sorteio-status status-open';
-                }
+        const sorteioData = estado.sorteios[config.id];
+
+        // Verificar se sorteio já foi realizado (tem resultado no Firebase)
+        if (sorteioData && sorteioData.resultado && sorteioData.resultado.length === 5) {
+            // Sorteio já realizado
+            card.classList.add('closed');
+            card.classList.remove('active');
+            statusEl.className = 'sorteio-status status-closed';
+            statusEl.textContent = 'REALIZADO';
+
+            // Mostrar bolas sorteadas
+            ballsEl.innerHTML = sorteioData.resultado.map(num => 
+                `<div class="ball">${String(num).padStart(2, '0')}</div>`
+            ).join('');
+
+            countdownEl.textContent = 'SORTEIO COMPLETO';
+            countdownEl.classList.remove('urgent');
+
+            // Se este era o selecionado, limpar seleção
+            if (estado.sorteioSelecionado === config.id) {
+                estado.sorteioSelecionado = null;
+                document.getElementById('sorteioNome').textContent = 'Nenhum';
+                document.getElementById('sorteioHora').textContent = '--:--';
+            }
+        } else if (horaSorteio > agora) {
+            // Sorteio futuro - aberto para apostas
+            card.classList.remove('closed');
+            statusEl.className = 'sorteio-status status-open';
+            statusEl.textContent = 'ABERTO';
+
+            // Calcular tempo restante
+            const diff = horaSorteio - agora;
+            const horas = Math.floor(diff / 3600000);
+            const minutos = Math.floor((diff % 3600000) / 60000);
+            const segundos = Math.floor((diff % 60000) / 1000);
+
+            countdownEl.textContent = `Fecha em: ${String(horas).padStart(2,'0')}:${String(minutos).padStart(2,'0')}:${String(segundos).padStart(2,'0')}`;
+
+            // Urgente se faltam menos de 30 minutos
+            if (diff < 1800000) {
+                countdownEl.classList.add('urgent');
             } else {
-                card.className = 'sorteio-card closed';
-                if (statusBadge) {
-                    statusBadge.textContent = 'Encerrado';
-                    statusBadge.className = 'sorteio-status status-closed';
-                }
+                countdownEl.classList.remove('urgent');
             }
-        } else if (minutosAteSorteio <= MINUTOS_FECHAMENTO) {
-            card.className = 'sorteio-card closed';
-            if (statusBadge) {
-                statusBadge.textContent = 'Fechado';
-                statusBadge.className = 'sorteio-status status-closed';
-            }
-        }
-    });
-}
 
-function updateCountdowns() {
-    const now = new Date();
-    const minutosAtual = now.getHours() * 60 + now.getMinutes();
-
-    SORTEIOS.forEach(sorteio => {
-        const el = document.getElementById(`countdown-${sorteio.id}`);
-        if (!el) return;
-
-        const minutosAteSorteio = sorteio.horaMin - minutosAtual;
-        const resultado = resultadosCache[sorteio.id];
-        const temResultado = !!resultado && resultado.numeros && resultado.numeros.length === 5;
-
-        if (minutosAteSorteio <= 0) {
-            if (temResultado) {
-                el.textContent = `Numeros: ${resultado.numeros.join(', ')}`;
-                el.classList.remove('urgent');
-                el.style.color = '#00ff88';
-            } else {
-                el.textContent = 'Sorteio realizado';
-                el.classList.remove('urgent');
-                el.style.color = '';
-            }
+            // Bolas placeholder
+            ballsEl.innerHTML = Array(5).fill('<div class="ball-placeholder"></div>').join('');
         } else {
-            el.textContent = formatCountdown(minutosAteSorteio);
-            el.style.color = '';
-            if (minutosAteSorteio <= 30) el.classList.add('urgent');
-            else el.classList.remove('urgent');
+            // Hora passou mas não tem resultado ainda - realizar sorteio automaticamente
+            card.classList.remove('closed');
+            statusEl.className = 'sorteio-status status-open';
+            statusEl.textContent = 'SORTEANDO...';
+            countdownEl.textContent = 'SORTEIO EM ANDAMENTO';
+            countdownEl.classList.add('urgent');
+
+            // Realizar sorteio automaticamente
+            realizarSorteio(config.id);
         }
     });
 }
 
-function formatCountdown(minutos) {
-    if (minutos <= 0) return 'Sorteio realizado';
-    const h = Math.floor(minutos / 60);
-    const m = minutes = minutos % 60;
-    if (h > 0) return `Faltam ${h}h ${m}min`;
-    return `Faltam ${m}min`;
+function startTimer() {
+    if (estado.timerInterval) clearInterval(estado.timerInterval);
+    estado.timerInterval = setInterval(() => {
+        atualizarInterfaceSorteios();
+    }, 1000);
 }
 
-function startCountdowns() {}
-
 // ============================================
-// CHANCE SELECTOR
+// REALIZAR SORTEIO (GERAR 5 BOLAS ALEATÓRIAS)
 // ============================================
-function selectChance(chance) {
-    selectedChance = chance;
-    selectedNumbers = [];
+function realizarSorteio(sorteioId) {
+    // Verificar se já existe resultado para evitar duplicados
+    db.ref(`mozlotto/sorteios/${sorteioId}/resultado`).once('value', (snapshot) => {
+        if (snapshot.exists()) return; // Já tem resultado
 
-    document.querySelectorAll('.chance-btn').forEach(btn => {
-        btn.classList.toggle('selected', parseInt(btn.dataset.chance) === chance);
+        // Gerar 5 números únicos de 1 a 90
+        const numeros = new Set();
+        while (numeros.size < 5) {
+            numeros.add(Math.floor(Math.random() * 90) + 1);
+        }
+        const resultado = Array.from(numeros).sort((a, b) => a - b);
+
+        // Salvar no Firebase
+        const agora = new Date();
+        db.ref(`mozlotto/sorteios/${sorteioId}`).set({
+            resultado: resultado,
+            dataRealizacao: agora.toISOString(),
+            totalApostas: 0,
+            totalPremios: 0
+        });
+
+        console.log(`Sorteio ${sorteioId} realizado:`, resultado);
     });
+}
 
-    document.getElementById('maxSelect').textContent = chance;
-    document.getElementById('selectedCount').textContent = '0';
-    document.getElementById('selectedBalls').innerHTML = '';
-    document.getElementById('btnApostar').disabled = true;
+// Forçar realização manual (para testes)
+function forcarSorteio(sorteioId) {
+    const numeros = new Set();
+    while (numeros.size < 5) {
+        numeros.add(Math.floor(Math.random() * 90) + 1);
+    }
+    const resultado = Array.from(numeros).sort((a, b) => a - b);
 
-    renderNumbersGrid();
-    renderPremiosTab(chance);
-    showToast(`Chance ${chance} selecionada - Escolha ${chance} numeros`, 'info');
+    db.ref(`mozlotto/sorteios/${sorteioId}`).set({
+        resultado: resultado,
+        dataRealizacao: new Date().toISOString(),
+        totalApostas: 0,
+        totalPremios: 0
+    });
 }
 
 // ============================================
-// NUMBER GRID
+// GRELLHA NUMÉRICA (1-90)
 // ============================================
-function renderNumbersGrid() {
+function initNumbersGrid() {
     const grid = document.getElementById('numbersGrid');
-    if (!grid) return;
     grid.innerHTML = '';
 
     for (let i = 1; i <= 90; i++) {
         const btn = document.createElement('button');
         btn.className = 'num-btn';
-        btn.textContent = i;
-        btn.dataset.num = i;
-
-        if (selectedNumbers.includes(i)) btn.classList.add('selected');
-        if (selectedNumbers.length >= selectedChance && !selectedNumbers.includes(i)) btn.classList.add('disabled');
-
-        btn.onclick = () => toggleNumber(i);
+        btn.textContent = String(i).padStart(2, '0');
+        btn.dataset.numero = i;
+        btn.onclick = () => toggleNumero(i);
         grid.appendChild(btn);
     }
 }
 
-function toggleNumber(num) {
-    if (selectedNumbers.includes(num)) {
-        selectedNumbers = selectedNumbers.filter(n => n !== num);
-    } else {
-        if (selectedNumbers.length >= selectedChance) {
-            showToast(`Ja selecionou ${selectedChance} numeros!`, 'error');
-            return;
+function selectChance(chance) {
+    estado.chanceSelecionada = chance;
+
+    // Atualizar botões visuais
+    document.querySelectorAll('.chance-btn').forEach(btn => {
+        btn.classList.remove('selected');
+        if (parseInt(btn.dataset.chance) === chance) {
+            btn.classList.add('selected');
         }
-        selectedNumbers.push(num);
-        selectedNumbers.sort((a, b) => a - b);
+    });
+
+    // Atualizar texto máximo
+    document.getElementById('maxSelect').textContent = chance;
+
+    // Se já tem mais números selecionados que o permitido, remover excesso
+    if (estado.numerosSelecionados.length > chance) {
+        estado.numerosSelecionados = estado.numerosSelecionados.slice(0, chance);
+        atualizarNumerosSelecionados();
     }
-    updateSelectedDisplay();
-    renderNumbersGrid();
+
+    atualizarBotaoApostar();
 }
 
-// ============================================
-// PLACEHOLDERS SISTEMA
-// ============================================
-function renderPremiosTab(chance) {}
-function renderRecibos() {}
-function updateJackpot() {}
-function populateAdminSelects() {}
-function verificarSorteiosPendentes() {}
-function showToast(msg, type) { console.log(`[${type.toUpperCase()}] ${msg}`); }
+function toggleNumero(numero) {
+    const index = estado.numerosSelecionados.indexOf(numero);
 
-function updateSelectedDisplay() {
-    document.getElementById('selectedCount').textContent = selectedNumbers.length;
-    document.getElementById('selectedBalls').innerHTML = selectedNumbers.map(n => 
-        `<div class="selected-ball">${n}</div>`
+    if (index > -1) {
+        // Desselecionar
+        estado.numerosSelecionados.splice(index, 1);
+    } else {
+        // Selecionar (se não atingiu o limite)
+        if (estado.numerosSelecionados.length < estado.chanceSelecionada) {
+            estado.numerosSelecionados.push(numero);
+            estado.numerosSelecionados.sort((a, b) => a - b);
+        } else {
+            alert(`Você só pode selecionar ${estado.chanceSelecionada} números para Chance ${estado.chanceSelecionada}!`);
+            return;
+        }
+    }
+
+    atualizarNumerosSelecionados();
+}
+
+function atualizarNumerosSelecionados() {
+    // Atualizar grid visual
+    document.querySelectorAll('.num-btn').forEach(btn => {
+        const num = parseInt(btn.dataset.numero);
+        btn.classList.toggle('selected', estado.numerosSelecionados.includes(num));
+    });
+
+    // Atualizar display
+    document.getElementById('selectedCount').textContent = estado.numerosSelecionados.length;
+
+    const display = document.getElementById('selectedBalls');
+    display.innerHTML = estado.numerosSelecionados.map(num => 
+        `<div class="selected-ball">${String(num).padStart(2, '0')}</div>`
     ).join('');
-    document.getElementById('btnApostar').disabled = selectedNumbers.length !== selectedChance;
+
+    atualizarBotaoApostar();
 }
 
 function clearSelection() {
-    selectedNumbers = [];
-    updateSelectedDisplay();
-    renderNumbersGrid();
+    estado.numerosSelecionados = [];
+    atualizarNumerosSelecionados();
+}
+
+function atualizarBotaoApostar() {
+    const btn = document.getElementById('btnApostar');
+    const podeApostar = estado.sorteioSelecionado && 
+                        estado.numerosSelecionados.length === estado.chanceSelecionada;
+    btn.disabled = !podeApostar;
 }
 
 // ============================================
 // FAZER APOSTA
 // ============================================
 function fazerAposta() {
-    if (!selectedSorteio) {
-        showToast('Selecione um sorteio primeiro!', 'error');
-        return;
-    }
-    if (selectedNumbers.length !== selectedChance) {
-        showToast(`Selecione exatamente ${selectedChance} numeros!`, 'error');
+    if (!estado.sorteioSelecionado) {
+        alert('Selecione um sorteio primeiro!');
         return;
     }
 
-    const now = new Date();
-    const minutosAtual = now.getHours() * 60 + now.getMinutes();
-    const minutosAteSorteio = selectedSorteio.horaMin - minutosAtual;
-
-    if (minutosAteSorteio <= MINUTOS_FECHAMENTO) {
-        showToast('As apostas para este sorteio ja estao fechadas!', 'error');
+    if (estado.numerosSelecionados.length !== estado.chanceSelecionada) {
+        alert(`Selecione exatamente ${estado.chanceSelecionada} números!`);
         return;
     }
 
-    const reciboNum = gerarNumeroRecibo();
-    const dataAposta = now.toISOString();
+    const config = SORTEOS_CONFIG.find(s => s.id === estado.sorteioSelecionado);
+    const idRecibo = gerarIdRecibo();
+    const valorAposta = 5; // 5 MTN
+
+    // Calcular prêmio potencial
+    const multiplicadores = { 2: 40, 3: 100, 4: 300, 5: 1000 };
+    const premioPotencial = valorAposta * multiplicadores[estado.chanceSelecionada];
 
     const aposta = {
-        recibo: reciboNum,
-        sorteioId: selectedSorteio.id,
-        sorteioNome: selectedSorteio.nome,
-        sorteioHora: selectedSorteio.hora,
-        chance: selectedChance,
-        numeros: [...selectedNumbers],
-        valor: VALOR_APOSTA,
-        dataAposta: dataAposta,
-        dataSorteio: getDataSorteio(selectedSorteio.horaMin),
-        status: 'pendente',
-        premio: 0,
-        pago: false,
-        verificado: false
+        id: idRecibo,
+        sorteioId: estado.sorteioSelecionado,
+        sorteioNome: config.nome,
+        sorteioHora: config.hora,
+        numeros: [...estado.numerosSelecionados],
+        chance: estado.chanceSelecionada,
+        valor: valorAposta,
+        premioPotencial: premioPotencial,
+        dataAposta: new Date().toISOString(),
+        status: 'PENDENTE',
+        pago: false
     };
 
-    const apostaRef = db.ref(`mozlottoganha/apostas/${selectedSorteio.id}/${reciboNum}`);
-    apostaRef.set(aposta).then(() => {
-        const acumuladoRef = db.ref(`mozlottoganha/acumulados/${selectedSorteio.id}/${getDataSorteio(selectedSorteio.horaMin)}`);
-        acumuladoRef.transaction(current => (current || 0) + VALOR_APOSTA);
+    // Salvar no Firebase
+    db.ref(`mozlotto/apostas/${idRecibo}`).set(aposta)
+        .then(() => {
+            // Incrementar contador do sorteio
+            db.ref(`mozlotto/sorteios/${estado.sorteioSelecionado}/totalApostas`).transaction(c => (c || 0) + 1);
 
-        recibosLocal.unshift(aposta);
-        localStorage.setItem('mozlottoganha_recibos', JSON.stringify(recibosLocal));
-
-        showToast('Aposta realizada com sucesso!', 'success');
-        showReciboModal(aposta);
-        renderRecibos();
-        updateJackpot();
-        clearSelection();
-    }).catch(err => {
-        showToast('Erro ao salvar aposta: ' + err.message, 'error');
-    });
+            mostrarRecibo(aposta);
+            clearSelection();
+        })
+        .catch(err => {
+            console.error('Erro ao salvar aposta:', err);
+            alert('Erro ao registrar aposta. Tente novamente.');
+        });
 }
 
-function gerarNumeroRecibo() {
+function gerarIdRecibo() {
+    const prefixo = 'MLG';
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-    return `MLG${timestamp}${random}`;
-}
-
-function getDataSorteio(horaMin) {
-    const now = new Date();
-    const sorteioHora = Math.floor(horaMin / 60);
-    const sorteioMin = horaMin % 60;
-    const sorteioDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sorteioHora, sorteioMin);
-    if (sorteioDate < now) sorteioDate.setDate(sorteioDate.getDate() + 1);
-    return sorteioDate.toISOString().split('T')[0];
+    return `${prefixo}-${timestamp}-${random}`;
 }
 
 // ============================================
-// RECIBO MODAL
+// RECIBO POS E MODAL
 // ============================================
-function showReciboModal(aposta) {
-    reciboAtual = aposta; 
+function mostrarRecibo(aposta) {
+    const config = SORTEOS_CONFIG.find(s => s.id === aposta.sorteioId);
+    const data = new Date(aposta.dataAposta);
+    const dataStr = data.toLocaleDateString('pt-MZ');
+    const horaStr = data.toLocaleTimeString('pt-MZ');
 
-    const modal = document.getElementById('modalRecibo');
-    const content = document.getElementById('reciboContent');
-    if (!modal || !content) return;
+    const multiplicadores = { 2: '40x', 3: '100x', 4: '300x', 5: '1000x' };
 
-    const dataAposta = new Date(aposta.dataAposta);
-    const dataStr = dataAposta.toLocaleDateString('pt-PT');
-    const horaStr = dataAposta.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'});
-
-    const barcodeLines = Array(24).fill(0).map(() => {
-        const patterns = ['||', '|||', '||||'];
-        return patterns[Math.floor(Math.random() * patterns.length)];
-    }).join('|');
-
-    content.innerHTML = `
-        <div class="pos-recibo" id="posRecibo">
+    const reciboHTML = `
+        <div class="pos-recibo" id="posReciboPrint">
             <div class="pos-header">
                 <h3>MOZLOTTOGANHA</h3>
-                <div class="sub">A SUA SORTE EM CADA BOLA</div>
-                <div class="sub">RECIBO OFICIAL DE APOSTA</div>
+                <div class="sub">Sistema de Lotaria & P.O.S</div>
+                <div class="sub">Moçambique</div>
             </div>
-            <div class="pos-divider">--------------------------------</div>
-            <div class="pos-line center bold">
-                <span class="value">${aposta.recibo}</span>
-            </div>
-            <div class="pos-divider">--------------------------------</div>
-            <div class="pos-section-title">DADOS DO SORTEIO</div>
+            <div class="pos-divider">========================</div>
+            <div class="pos-section-title">RECIBO DE APOSTA</div>
             <div class="pos-line">
-                <span class="label">Sorteio:</span>
-                <span class="value">${aposta.sorteioNome}</span>
+                <span>ID:</span>
+                <span>${aposta.id}</span>
             </div>
             <div class="pos-line">
-                <span class="label">Hora:</span>
-                <span class="value">${aposta.sorteioHora}h</span>
+                <span>Data:</span>
+                <span>${dataStr} ${horaStr}</span>
+            </div>
+            <div class="pos-divider">------------------------</div>
+            <div class="pos-line bold">
+                <span>SORTEIO:</span>
+                <span>${aposta.sorteioNome}</span>
             </div>
             <div class="pos-line">
-                <span class="label">Data:</span>
-                <span class="value">${dataStr}</span>
+                <span>Hora:</span>
+                <span>${aposta.sorteioHora}</span>
             </div>
-            <div class="pos-line">
-                <span class="label">Hora Reg:</span>
-                <span class="value">${horaStr}</span>
-            </div>
-            <div class="pos-divider">--------------------------------</div>
-            <div class="pos-line center big">
-                <span class="value">CHANCE ${aposta.chance}</span>
-            </div>
-            <div class="pos-divider">--------------------------------</div>
-            <div class="pos-section-title">NUMEROS JOGADOS</div>
+            <div class="pos-divider">------------------------</div>
+            <div class="pos-section-title">NÚMEROS APOSTADOS</div>
             <div class="pos-balls-row">
-                ${aposta.numeros.map(n => `<div class="pos-ball">${String(n).padStart(2, '0')}</div>`).join('')}
+                ${aposta.numeros.map(n => `<div class="pos-ball">${String(n).padStart(2,'0')}</div>`).join('')}
             </div>
-            <div class="pos-divider">--------------------------------</div>
+            <div class="pos-line">
+                <span>Chance:</span>
+                <span>${aposta.chance} (${multiplicadores[aposta.chance]})</span>
+            </div>
+            <div class="pos-divider">------------------------</div>
             <div class="pos-valor-box">
-                <div class="label">TOTAL A PAGAR</div>
-                <div class="valor">${aposta.valor.toLocaleString('pt-PT')} MTN</div>
+                <div class="label">VALOR DA APOSTA</div>
+                <div class="valor">${aposta.valor.toFixed(2)} MTN</div>
             </div>
-            <div class="pos-divider">--------------------------------</div>
+            <div class="pos-valor-box" style="border-color: #00aa00;">
+                <div class="label">PRÊMIO POTENCIAL</div>
+                <div class="valor" style="color: #00aa00;">${aposta.premioPotencial.toFixed(2)} MTN</div>
+            </div>
+            <div class="pos-divider">------------------------</div>
             <div class="pos-barcode-area">
-                <div class="pos-barcode-lines">${barcodeLines}</div>
-                <div class="pos-barcode">${aposta.recibo}</div>
+                <div class="pos-barcode-lines">||||||||||||||||||||||||</div>
+                <div class="pos-barcode">${aposta.id}</div>
             </div>
+            <div class="pos-divider">========================</div>
             <div class="pos-footer">
-                <p><strong>BOA SORTE!</strong></p>
-                <p>Guarde este recibo para verificacao</p>
-                <p>Apresente-o para receber premios</p>
-                <p>mozlottoganha.com</p>
-                <p>${dataStr} ${horaStr}</p>
+                <p>Guarde este recibo para verificação</p>
+                <p>Apresente em caso de prémio</p>
+                <p>Suporte: 860407269</p>
+                <p>Islammocambique@gmail.com</p>
+                <p>BOA SORTE!</p>
             </div>
         </div>
     `;
 
-    modal.classList.add('active');
+    document.getElementById('reciboContent').innerHTML = reciboHTML;
+    document.getElementById('modalRecibo').classList.add('active');
 }
 
 function closeModal() {
-    const modal = document.getElementById('modalRecibo');
-    if (modal) modal.classList.remove('active');
+    document.getElementById('modalRecibo').classList.remove('active');
 }
 
-// ============================================
-// IMPRESSAO BLUETOOTH ESC/POS (OTIMIZADO P.O.S)
-// ============================================
-const ESC = 0x1B;
-const LF = 0x0A;
-const GS = 0x1D;
-
-async function printBluetooth() {
-    try {
-        if (!navigator.bluetooth) {
-            showToast('Web Bluetooth nao suportado. Use Chrome.', 'error');
-            return;
-        }
-
-        if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
-            showToast('Selecione a impressora...', 'info');
-            bluetoothDevice = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [
-                    '000018f0-0000-1000-8000-00805f9b34fb',
-                    '0000ff00-0000-1000-8000-00805f9b34fb'
-                ]
-            });
-        }
-
-        showToast(`Conectando...`, 'info');
-        const server = await bluetoothDevice.gatt.connect();
-
-        let service;
-        const serviceUUIDs = [
-            '000018f0-0000-1000-8000-00805f9b34fb',
-            '0000ff00-0000-1000-8000-00805f9b34fb'
-        ];
-
-        for (const uuid of serviceUUIDs) {
-            try { service = await server.getPrimaryService(uuid); break; }
-            catch (e) { continue; }
-        }
-
-        if (!service) {
-            const services = await server.getPrimaryServices();
-            if (services.length > 0) service = services[0];
-            else throw new Error('Nenhum servico encontrado');
-        }
-
-        let characteristic;
-        const characteristics = await service.getCharacteristics();
-        for (const char of characteristics) {
-            if (char.properties.write || char.properties.writeWithoutResponse) {
-                characteristic = char;
-                break;
-            }
-        }
-
-        if (!characteristic) throw new Error('Sem caracteristica de escrita');
-        bluetoothCharacteristic = characteristic;
-
-        const reciboData = generateEscPosReceipt();
-
-        const chunkSize = 100;
-        for (let i = 0; i < reciboData.length; i += chunkSize) {
-            const chunk = reciboData.slice(i, i + chunkSize);
-            await characteristic.writeValue(chunk);
-        }
-
-        showToast('Recibo impresso!', 'success');
-
-    } catch (err) {
-        console.error('Erro Bluetooth:', err);
-        showToast('Erro: ' + err.message, 'error');
-    }
-}
-
-function generateEscPosReceipt() {
-    const aposta = reciboAtual || {
-        recibo: 'MLG000000000',
-        sorteioNome: 'Sorteio',
-        sorteioHora: '00:00',
-        chance: 5,
-        numeros: [1,2,3,4,5],
-        valor: 5,
-        dataAposta: new Date().toISOString()
-    };
-
-    const dataAposta = new Date(aposta.dataAposta);
-    const dataStr = dataAposta.toLocaleDateString('pt-PT');
-    const horaStr = dataAposta.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
-
-    const encoder = new TextEncoder();
-    const bytes = [];
-
-    // Reset da impressora
-    bytes.push(ESC, 0x40);
-
-    // === CABECALHO ===
-    bytes.push(ESC, 0x61, 0x01); // Centralizar
-    bytes.push(ESC, 0x21, 0x20); // Negrito + Fonte Expandida (Altura Dupla)
-    bytes.push(...encoder.encode('MOZLOTTOGANHA'));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00); // Normal
-    bytes.push(...encoder.encode('A SUA SORTE EM CADA BOLA'));
-    bytes.push(LF);
-    bytes.push(...encoder.encode('RECIBO OFICIAL DE APOSTA'));
-    bytes.push(LF);
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === ID RECIBO ===
-    bytes.push(ESC, 0x21, 0x10); // Negrito Simples
-    bytes.push(...encoder.encode(aposta.recibo));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00); // Normal
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === METADADOS DO SORTEIO ===
-    bytes.push(ESC, 0x61, 0x00); // Alinhamento a Esquerda
-    bytes.push(...encoder.encode('Sorteio: ' + aposta.sorteioNome)); bytes.push(LF);
-    bytes.push(...encoder.encode('Hora:    ' + aposta.sorteioHora + 'h')); bytes.push(LF);
-    bytes.push(...encoder.encode('Data:    ' + dataStr)); bytes.push(LF);
-    bytes.push(...encoder.encode('Registro:' + horaStr)); bytes.push(LF);
-    bytes.push(ESC, 0x61, 0x01); // Centralizar
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === MODALIDADE CHANCE ===
-    bytes.push(ESC, 0x21, 0x20); // Negrito Expandido
-    bytes.push(...encoder.encode('CHANCE ' + aposta.chance));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00); // Normal
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === NUMEROS JOGADOS ===
-    bytes.push(...encoder.encode('NUMEROS SELECIONADOS:'));
-    bytes.push(LF, LF);
-    bytes.push(ESC, 0x21, 0x30); // Fonte Muito Grande (Dupla Largura + Altura)
-    const numsFormatted = aposta.numeros.map(n => String(n).padStart(2, '0')).join(' ');
-    bytes.push(...encoder.encode(numsFormatted));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00); // Normal
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === CAIXA DE VALOR ===
-    bytes.push(...encoder.encode('TOTAL VALOR:'));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x30); // Destaque total no dinheiro
-    bytes.push(...encoder.encode(aposta.valor + ' MTN'));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00); // Normal
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === CODIGO DE BARRAS SIMULADO ===
-    const barcodeSim = Array(18).fill(0).map((_, i) => (i % 2 === 0 ? '|||' : '||')).join('|');
-    bytes.push(...encoder.encode(barcodeSim));
-    bytes.push(LF);
-    bytes.push(...encoder.encode(aposta.recibo));
-    bytes.push(LF);
-    bytes.push(...encoder.encode('--------------------------------'));
-    bytes.push(LF);
-
-    // === RODAPE LEGAL ===
-    bytes.push(ESC, 0x21, 0x10);
-    bytes.push(...encoder.encode('BOA SORTE!'));
-    bytes.push(LF);
-    bytes.push(ESC, 0x21, 0x00);
-    bytes.push(...encoder.encode('Conserve este bilhete fisico.')); bytes.push(LF);
-    bytes.push(...encoder.encode('Validacao automatica via Web.')); bytes.push(LF);
-    bytes.push(...encoder.encode('mozlottoganha.com')); bytes.push(LF);
-    bytes.push(...encoder.encode(dataStr + ' ' + horaStr)); bytes.push(LF);
-
-    // Feed de papel para corte correto (evita cortar o texto)
-    bytes.push(LF, LF, LF, LF);
-    // Comando de guilhotina nativo ESC/POS (GS V 0)
-    bytes.push(GS, 0x56, 0x00);
-
-    return new Uint8Array(bytes);
-}
-
-// ============================================
-// IMPRESSAO EM TELA - FORMATO P.O.S REALISTA
-// ============================================
 function printScreen() {
-    const recibo = document.getElementById('posRecibo');
+    const recibo = document.getElementById('posReciboPrint');
     if (!recibo) return;
+
     const printWindow = window.open('', '_blank');
-
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-    <title>Impressao P.O.S - MozLottoGanha</title>
-    <style>
-        @media print { 
-            body { margin: 0; padding: 0; background: #fff; } 
-            .no-print { display: none; } 
-            .pos-recibo { border: none !important; box-shadow: none !important; width: 100% !important; padding: 0 !important; }
-        }
-        body { font-family: 'Courier New', monospace; padding: 10px; background: #eef0f3; display: flex; flex-direction: column; align-items: center; }
-        .pos-recibo { width: 280px; background: #fff; border: 1px dashed #aaa; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 12px; color: #000; line-height: 1.3; }
-        .pos-header { text-align: center; }
-        .pos-header h3 { font-size: 16px; margin: 0 0 4px 0; font-weight: bold; letter-spacing: 1px; }
-        .pos-header .sub { font-size: 10px; margin: 2px 0; font-weight: bold; }
-        .pos-divider { text-align: center; margin: 4px 0; font-weight: bold; letter-spacing: -1px; }
-        .pos-section-title { text-align: center; font-size: 10px; font-weight: bold; margin: 4px 0; text-decoration: underline; }
-        .pos-line { display: flex; justify-content: space-between; padding: 1px 0; font-size: 11px; }
-        .pos-line.center { justify-content: center; text-align: center; }
-        .pos-line.bold { font-weight: bold; font-size: 14px; }
-        .pos-line.big { font-size: 15px; font-weight: bold; }
-        .pos-balls-row { display: flex; gap: 4px; justify-content: center; margin: 6px 0; flex-wrap: wrap; }
-        .pos-ball { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #fff; color: #000; }
-        .pos-barcode-area { text-align: center; margin: 6px 0; }
-        .pos-barcode { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-        .pos-barcode-lines { font-size: 16px; font-weight: normal; letter-spacing: 0; margin-bottom: 2px; overflow: hidden; white-space: nowrap; }
-        .pos-footer { text-align: center; font-size: 10px; margin-top: 6px; }
-        .pos-footer p { margin: 2px 0; }
-        .pos-valor-box { border: 2px solid #000; padding: 6px; text-align: center; margin: 6px 0; background: #fff; }
-        .pos-valor-box .label { font-size: 10px; font-weight: bold; }
-        .pos-valor-box .valor { font-size: 18px; font-weight: bold; }
-        .print-btn { display: block; width: 220px; margin: 15px auto; padding: 10px; background: #1a1a2e; color: #fff; border: none; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; border-radius: 4px; font-family: sans-serif; }
-    </style>
-</head>
-<body>
-    ${recibo.outerHTML}
-    <button class="print-btn no-print" onclick="window.print()">CONFIRMAR IMPRESSAO (P.O.S)</button>
-    <script>
-        window.onload = function() { setTimeout(function() { window.print(); }, 250); };
-    </script>
-</body>
-</html>`;
-
-    printWindow.document.write(htmlContent);
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Recibo MOZLOTTOGANHA</title>
+            <style>
+                body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f0f0; }
+                .pos-recibo { width: 280px; background: #fff; color: #000; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.3; border: 1px dashed #777; }
+                .pos-header { text-align: center; }
+                .pos-header h3 { font-size: 16px; margin: 0 0 4px 0; font-weight: bold; }
+                .pos-header .sub { font-size: 10px; margin: 2px 0; font-weight: bold; }
+                .pos-divider { text-align: center; margin: 5px 0; font-weight: bold; }
+                .pos-section-title { text-align: center; font-size: 10px; font-weight: bold; margin: 6px 0; text-decoration: underline; }
+                .pos-line { display: flex; justify-content: space-between; padding: 2px 0; }
+                .pos-line.center { justify-content: center; }
+                .pos-line.bold { font-weight: bold; font-size: 14px; }
+                .pos-line.big { font-size: 15px; font-weight: bold; }
+                .pos-balls-row { display: flex; gap: 5px; justify-content: center; margin: 8px 0; }
+                .pos-ball { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; background: #fff; }
+                .pos-valor-box { border: 2px solid #000; padding: 6px; text-align: center; margin: 8px 0; }
+                .pos-valor-box .label { font-size: 10px; font-weight: bold; }
+                .pos-valor-box .valor { font-size: 18px; font-weight: bold; }
+                .pos-barcode-area { text-align: center; margin: 8px 0; }
+                .pos-barcode-lines { font-size: 14px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
+                .pos-barcode { font-size: 9px; font-weight: bold; }
+                .pos-footer { text-align: center; font-size: 9px; margin-top: 8px; }
+                .pos-footer p { margin: 2px 0; }
+            </style>
+        </head>
+        <body>
+            ${recibo.outerHTML}
+            <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
+        </body>
+        </html>
+    `);
     printWindow.document.close();
-    showToast('Janela de impressao aberta!', 'info');
 }
 
-// ============================================
-// VERIFICAR RECIBO
-// ============================================
-async function verificarRecibo() {
-    const input = document.getElementById('verificarInput').value.trim().toUpperCase();
-    const resultDiv = document.getElementById('verificarResult');
-
-    if (!input) {
-        showToast('Digite o numero do recibo!', 'error');
+function printBluetooth() {
+    if (!navigator.bluetooth) {
+        alert('Web Bluetooth API não disponível neste navegador. Use Chrome/Edge no Android ou imprima via navegador.');
         return;
     }
 
-    if (resultDiv) resultDiv.innerHTML = '<div class="spinner"></div>';
-
-    try {
-        let apostaEncontrada = null;
-        const snapshot = await db.ref('mozlottoganha/apostas').once('value');
-        const todosSorteios = snapshot.val() || {};
-
-        for (const sorteioId in todosSorteios) {
-            if (todosSorteios[sorteioId][input]) {
-                apostaEncontrada = todosSorteios[sorteioId][input];
-                break;
-            }
-        }
-
-        if (!apostaEncontrada) {
-            if (resultDiv) resultDiv.innerHTML = '<p style="color:#ff4a4a;">Recibo nao encontrado no sistema.</p>';
-            return;
-        }
-
-        const resultadoSorteio = resultadosCache[apostaEncontrada.sorteioId];
-        
-        if (!resultadoSorteio || !resultadoSorteio.numeros) {
-            if (resultDiv) {
-                resultDiv.innerHTML = `
-                    <div class="result-box info">
-                        <p><strong>Recibo:</strong> ${apostaEncontrada.recibo}</p>
-                        <p><strong>Sorteio:</strong> ${apostaEncontrada.sorteioNome} (${apostaEncontrada.sorteioHora}h)</p>
-                        <p style="color:#f4c430;">Aguardando a realizacao do sorteio oficial.</p>
-                    </div>`;
-            }
-            return;
-        }
-
-        const numerosSorteados = resultadoSorteio.numeros;
-        const acertos = apostaEncontrada.numeros.filter(n => numerosSorteados.includes(n)).length;
-        
-        let valorPremio = 0;
-        const tabelaChance = PREMIOS[apostaEncontrada.chance];
-        if (tabelaChance) {
-            const faixaPremio = tabelaChance.find(p => p.acertos === acertos);
-            if (faixaPremio) valorPremio = faixaPremio.premio;
-        }
-
-        if (resultDiv) {
-            if (valorPremio > 0) {
-                resultDiv.innerHTML = `
-                    <div class="result-box success" style="border: 2px solid #00ff88; padding: 15px; background: rgba(0,255,136,0.1);">
-                        <h4 style="color:#00ff88; margin:0 0 10px 0;">BILHETE PREMIADO! 👑</h4>
-                        <p><strong>Recibo:</strong> ${apostaEncontrada.recibo}</p>
-                        <p><strong>Acertos:</strong> ${acertos} de ${apostaEncontrada.chance}</p>
-                        <p><strong>Numeros Sorteadas:</strong> ${numerosSorteados.join(', ')}</p>
-                        <p style="font-size:18px; font-weight:bold; color:#f4c430; margin:10px 0 0 0;">Premio: ${valorPremio.toLocaleString('pt-PT')} MTN</p>
-                    </div>`;
-            } else {
-                resultDiv.innerHTML = `
-                    <div class="result-box" style="border: 1px solid #ff4a4a; padding: 15px; background: rgba(255,74,74,0.05);">
-                        <h4 style="color:#ff4a4a; margin:0 0 10px 0;">Nao Premiado</h4>
-                        <p><strong>Recibo:</strong> ${apostaEncontrada.recibo}</p>
-                        <p><strong>Acertos:</strong> ${acertos} acertos</p>
-                        <p><strong>Numeros Sorteadas:</strong> ${numerosSorteados.join(', ')}</p>
-                    </div>`;
-            }
-        }
-
-    } catch (err) {
-        console.error('Erro ao verificar recibo:', err);
-        if (resultDiv) resultDiv.innerHTML = '<p style="color:#ff4a4a;">Erro ao processar verificacao.</p>';
-    }
+    navigator.bluetooth.requestDevice({
+        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    })
+    .then(device => device.gatt.connect())
+    .then(server => server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'))
+    .then(service => service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'))
+    .then(characteristic => {
+        const recibo = document.getElementById('posReciboPrint');
+        const texto = recibo.innerText;
+        const encoder = new TextEncoder();
+        return characteristic.writeValue(encoder.encode(texto + '\n\n\n'));
+    })
+    .then(() => alert('Recibo enviado para impressora Bluetooth!'))
+    .catch(err => {
+        console.error('Erro Bluetooth:', err);
+        alert('Erro ao conectar impressora Bluetooth: ' + err.message);
+    });
 }
+
+// ============================================
+// VERIFICADOR DE RECIBOS
+// ============================================
+function verificarRecibo() {
+    const input = document.getElementById('verificarInput');
+    const idRecibo = input.value.trim().toUpperCase();
+    const resultDiv = document.getElementById('verificarResult');
+
+    if (!idRecibo) {
+        resultDiv.innerHTML = '<p style="color: #ff4a4a;">Insira um ID de recibo!</p>';
+        return;
+    }
+
+    resultDiv.innerHTML = '<p style="color: var(--text-muted);">Verificando...</p>';
+
+    db.ref(`mozlotto/apostas/${idRecibo}`).once('value', (snapshot) => {
+        const aposta = snapshot.val();
+
+        if (!aposta) {
+            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo não encontrado! Verifique o ID.</p>';
+            return;
+        }
+
+        // Buscar resultado do sorteio
+        db.ref(`mozlotto/sorteios/${aposta.sorteioId}/resultado`).once('value', (resSnapshot) => {
+            const resultado = resSnapshot.val();
+
+            if (!resultado) {
+                // Sorteio ainda não realizado
+                resultDiv.innerHTML = `
+                    <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid #252545;">
+                        <h4 style="color: var(--accent); margin-top: 0;">📋 RECIBO VÁLIDO</h4>
+                        <p><strong>ID:</strong> ${aposta.id}</p>
+                        <p><strong>Sorteio:</strong> ${aposta.sorteioNome} (${aposta.sorteioHora})</p>
+                        <p><strong>Números:</strong> ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ')}</p>
+                        <p><strong>Chance:</strong> ${aposta.chance}</p>
+                        <p><strong>Valor:</strong> ${aposta.valor.toFixed(2)} MTN</p>
+                        <p><strong>Status:</strong> <span style="color: #f4c430;">⏳ Aguardando sorteio</span></p>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">O sorteio ainda não foi realizado. Volte após ${aposta.sorteioHora}.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Verificar acertos
+            const acertos = aposta.numeros.filter(n => resultado.includes(n));
+            const numAcertos = acertos.length;
+
+            // Determinar se ganhou (deve acertar todos os números da chance)
+            const ganhou = numAcertos >= aposta.chance;
+
+            // Calcular prêmio
+            let premio = 0;
+            if (ganhou) {
+                const multiplicadores = { 2: 40, 3: 100, 4: 300, 5: 1000 };
+                premio = aposta.valor * multiplicadores[aposta.chance];
+            }
+
+            const statusColor = ganhou ? '#00ff88' : (numAcertos > 0 ? '#f4c430' : '#ff4a4a');
+            const statusText = ganhou ? '🎉 GANHADOR!' : (numAcertos > 0 ? `⚠️ Acertou ${numAcertos} número(s)` : '❌ Não foi desta vez');
+
+            let html = `
+                <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid ${statusColor};">
+                    <h4 style="color: ${statusColor}; margin-top: 0;">${statusText}</h4>
+                    <p><strong>ID:</strong> ${aposta.id}</p>
+                    <p><strong>Sorteio:</strong> ${aposta.sorteioNome}</p>
+                    <div style="margin: 10px 0;">
+                        <p style="margin: 5px 0;"><strong>Números Sorteados:</strong></p>
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            ${resultado.map(n => {
+                                const acertou = aposta.numeros.includes(n);
+                                return `<div style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; background: ${acertou ? '#00ff88' : '#f4c430'}; color: #000;">${String(n).padStart(2,'0')}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <div style="margin: 10px 0;">
+                        <p style="margin: 5px 0;"><strong>Seus Números:</strong></p>
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            ${aposta.numeros.map(n => {
+                                const acertou = resultado.includes(n);
+                                return `<div style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; background: ${acertou ? '#00ff88' : '#1f1f3a'}; color: ${acertou ? '#000' : '#fff'}; border: 1px solid ${acertou ? '#00ff88' : '#2f2f54'};">${String(n).padStart(2,'0')}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <p><strong>Acertos:</strong> ${numAcertos} de ${aposta.chance} necessários</p>
+            `;
+
+            if (ganhou) {
+                html += `
+                    <div style="background: rgba(0, 255, 136, 0.1); border: 2px solid #00ff88; padding: 10px; border-radius: 6px; text-align: center; margin: 10px 0;">
+                        <p style="margin: 0; font-size: 0.9rem;">PRÊMIO A RECEBER</p>
+                        <p style="margin: 5px 0; font-size: 1.5rem; font-weight: bold; color: #00ff88;">${premio.toFixed(2)} MTN</p>
+                    </div>
+                `;
+
+                if (!aposta.pago) {
+                    html += `
+                        <button onclick="pagarPremio('${aposta.id}', ${premio})" style="width: 100%; padding: 12px; background: #00ff88; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;">
+                            💰 CONFIRMAR PAGAMENTO DO PRÊMIO
+                        </button>
+                    `;
+                } else {
+                    html += `<p style="color: #00ff88; text-align: center; font-weight: bold;">✅ PRÊMIO JÁ PAGO</p>`;
+                }
+            }
+
+            html += `</div>`;
+            resultDiv.innerHTML = html;
+        });
+    });
+}
+
+function pagarPremio(idRecibo, valor) {
+    if (!confirm(`Confirmar pagamento de ${valor.toFixed(2)} MTN para o recibo ${idRecibo}?`)) {
+        return;
+    }
+
+    db.ref(`mozlotto/apostas/${idRecibo}`).update({
+        pago: true,
+        dataPagamento: new Date().toISOString(),
+        valorPago: valor
+    }).then(() => {
+        // Incrementar total de prémios do sorteio
+        db.ref(`mozlotto/apostas/${idRecibo}`).once('value', (snap) => {
+            const aposta = snap.val();
+            if (aposta) {
+                db.ref(`mozlotto/sorteios/${aposta.sorteioId}/totalPremios`).transaction(c => (c || 0) + valor);
+            }
+        });
+
+        alert(`✅ Prémio de ${valor.toFixed(2)} MTN pago com sucesso!`);
+        verificarRecibo(); // Recarregar verificação
+    }).catch(err => {
+        alert('Erro ao processar pagamento: ' + err.message);
+    });
+}
+
+// ============================================
+// FUNÇÕES DE UTILIDADE
+// ============================================
+// Fechar modal ao clicar fora
+document.getElementById('modalRecibo').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modalRecibo')) {
+        closeModal();
+    }
+});
+
+// Tecla ESC fecha modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+});

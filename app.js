@@ -1,6 +1,6 @@
 // ============================================
-// MOZLOTTOGANHA - APP.JS COMPLETO (v5 FINAL)
-// Regras EXATAS do utilizador
+// MOZLOTTOGANHA - APP.JS COMPLETO (v6)
+// Com botao PAGAR RECIBO para evitar duplicacao
 // ============================================
 
 const firebaseConfig = {
@@ -17,7 +17,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- SORTEIOS EXATOS DO UTILIZADOR ---
+// --- SORTEIOS EXATOS ---
 const SORTEOS_CONFIG = [
     { id: 's1', nome: 'Sorteio Manha Quente', hora: '08:00' },
     { id: 's2', nome: 'Sorteio da Sorte', hora: '10:00' },
@@ -36,9 +36,6 @@ const TABELA_PREMIOS = {
     3: { 3: 5000, 2: 50, 1: 5 },
     2: { 2: 250, 1: 25 }
 };
-
-// Multiplicadores para calculo do premio potencial no recibo
-const MULTIPLICADORES = { 5: '500000x', 4: '10000x', 3: '5000x', 2: '250x' };
 
 let estado = {
     sorteioSelecionado: null,
@@ -202,7 +199,7 @@ function atualizarInterfaceSorteios() {
             return;
         }
 
-        // Apostas encerradas (menos de 15 minutos) mas sorteio nao realizado
+        // Apostas encerradas (menos de 15 minutos)
         if (agora >= horaFecho && agora < horaSorteio) {
             card.classList.remove('active');
             card.classList.add('locked');
@@ -225,7 +222,7 @@ function atualizarInterfaceSorteios() {
             return;
         }
 
-        // Sorteio futuro - aberto para apostas
+        // Sorteio futuro - aberto
         if (horaSorteio > agora) {
             card.classList.remove('closed', 'locked');
             statusEl.className = 'sorteio-status status-open';
@@ -241,7 +238,7 @@ function atualizarInterfaceSorteios() {
 
             ballsEl.innerHTML = Array(5).fill('<div class="ball-placeholder"></div>').join('');
         } else {
-            // Hora passou mas nao tem resultado - realizar sorteio
+            // Hora passou - realizar sorteio
             card.classList.remove('closed', 'locked');
             statusEl.className = 'sorteio-status status-open';
             statusEl.textContent = 'SORTEANDO...';
@@ -262,11 +259,9 @@ function startTimer() {
 // SORTEIO INTELIGENTE (~40% PAYOUT)
 // ============================================
 async function realizarSorteioInteligente(sorteioId) {
-    // Verificar se ja existe resultado
     const snap = await db.ref(`mozlotto/sorteios/${sorteioId}/resultado`).once('value');
     if (snap.exists()) return;
 
-    // Buscar todas as apostas deste sorteio
     const apostasSnap = await db.ref('mozlotto/apostas').orderByChild('sorteioId').equalTo(sorteioId).once('value');
     const apostas = apostasSnap.val() || {};
     const listaApostas = Object.values(apostas);
@@ -274,11 +269,9 @@ async function realizarSorteioInteligente(sorteioId) {
     const totalArrecadado = listaApostas.reduce((sum, a) => sum + (a.valor || 5), 0);
     const maxPremios = Math.floor(totalArrecadado * 0.40);
 
-    // Gerar resultado inteligente
     let melhorResultado = null;
     let melhorCusto = Infinity;
 
-    // Tentar varias combinacoes e escolher uma que fique dentro do orcamento
     for (let tentativa = 0; tentativa < 500; tentativa++) {
         const numeros = new Set();
         while (numeros.size < 5) {
@@ -286,25 +279,20 @@ async function realizarSorteioInteligente(sorteioId) {
         }
         const resultado = Array.from(numeros).sort((a, b) => a - b);
 
-        // Calcular custo total de premios com este resultado
         let custoPremios = 0;
         listaApostas.forEach(aposta => {
             const acertos = aposta.numeros.filter(n => resultado.includes(n)).length;
-            const premio = TABELA_PREMIOS[aposta.chance]?.[acertos] || 0;
-            custoPremios += premio;
+            custoPremios += TABELA_PREMIOS[aposta.chance]?.[acertos] || 0;
         });
 
-        // Se custo <= 40% do arrecadado, e o melhor ate agora
         if (custoPremios <= maxPremios && custoPremios < melhorCusto) {
             melhorResultado = resultado;
             melhorCusto = custoPremios;
         }
 
-        // Se encontrou um resultado viavel, para
         if (melhorResultado && tentativa > 50) break;
     }
 
-    // Se nao encontrou nenhum resultado viavel, gera aleatorio (raro)
     if (!melhorResultado) {
         const numeros = new Set();
         while (numeros.size < 5) {
@@ -326,8 +314,6 @@ async function realizarSorteioInteligente(sorteioId) {
         totalPremios: melhorCusto,
         totalApostas: listaApostas.length
     });
-
-    console.log(`Sorteio ${sorteioId}:`, melhorResultado, `Custo: ${melhorCusto}/${maxPremios} MTN`);
 }
 
 function forcarSorteio(sorteioId) {
@@ -399,9 +385,7 @@ function clearSelection() {
 
 function atualizarBotaoApostar() {
     const btn = document.getElementById('btnApostar');
-    const pode = estado.sorteioSelecionado && 
-                 estado.numerosSelecionados.length === estado.chanceSelecionada;
-    btn.disabled = !pode;
+    btn.disabled = !(estado.sorteioSelecionado && estado.numerosSelecionados.length === estado.chanceSelecionada);
 }
 
 // ============================================
@@ -419,9 +403,6 @@ function fazerAposta() {
 
     const config = SORTEOS_CONFIG.find(s => s.id === estado.sorteioSelecionado);
     const idRecibo = gerarIdRecibo();
-    const valorAposta = 5;
-
-    // Premio maximo potencial (todos acertos)
     const premioMaximo = TABELA_PREMIOS[estado.chanceSelecionada][estado.chanceSelecionada];
 
     const aposta = {
@@ -431,10 +412,11 @@ function fazerAposta() {
         sorteioHora: config.hora,
         numeros: [...estado.numerosSelecionados],
         chance: estado.chanceSelecionada,
-        valor: valorAposta,
+        valor: 5,
         premioMaximo: premioMaximo,
         dataAposta: new Date().toISOString(),
-        pago: false
+        pago: false,
+        dataPagamento: null
     };
 
     db.ref(`mozlotto/apostas/${idRecibo}`).set(aposta)
@@ -443,9 +425,7 @@ function fazerAposta() {
             mostrarRecibo(aposta);
             clearSelection();
         })
-        .catch(err => {
-            alert('Erro ao registrar: ' + err.message);
-        });
+        .catch(err => alert('Erro ao registrar: ' + err.message));
 }
 
 function gerarIdRecibo() {
@@ -703,8 +683,7 @@ async function enviarParaImpressora(characteristic) {
 }
 
 // ============================================
-// VERIFICADOR DE RECIBOS - CORRIGIDO
-// Mostra PREMIO REAL baseado na tabela
+// VERIFICADOR DE RECIBOS - COM BOTAO PAGAR
 // ============================================
 function verificarRecibo() {
     const input = document.getElementById('verificarInput');
@@ -748,11 +727,9 @@ function verificarRecibo() {
                 return;
             }
 
-            // Calcular acertos
+            // Calcular acertos e premio
             const acertos = aposta.numeros.filter(n => resultado.includes(n));
             const numAcertos = acertos.length;
-
-            // Calcular PREMIO REAL pela tabela
             const premio = TABELA_PREMIOS[aposta.chance]?.[numAcertos] || 0;
             const ganhou = premio > 0;
 
@@ -761,9 +738,14 @@ function verificarRecibo() {
                 ? `🎉 GANHOU ${premio.toLocaleString('pt-MZ')} MTN!` 
                 : `❌ Acertou ${numAcertos} - Sem premio`;
 
+            // Verificar se ja foi pago
+            const jaPago = aposta.pago === true;
+
             let html = `
-                <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 2px solid ${statusColor};">
-                    <h3 style="color: ${statusColor}; margin-top: 0; font-size: 1.3rem; text-align: center;">${statusText}</h3>
+                <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 2px solid ${jaPago ? '#4a4aff' : statusColor};">
+                    <h3 style="color: ${jaPago ? '#4a4aff' : statusColor}; margin-top: 0; font-size: 1.3rem; text-align: center;">
+                        ${jaPago ? '✅ RECIBO JA PAGO' : statusText}
+                    </h3>
                     <hr style="border-color: #252545; margin: 10px 0;">
                     <p><strong>ID:</strong> ${aposta.id}</p>
                     <p><strong>Sorteio:</strong> ${aposta.sorteioNome}</p>
@@ -792,28 +774,38 @@ function verificarRecibo() {
                     <p><strong>Chance:</strong> ${aposta.chance}</p>
             `;
 
-            if (ganhou) {
+            if (ganhou && !jaPago) {
+                // MOSTRAR PREMIO E BOTAO PAGAR
                 html += `
                     <div style="background: rgba(0, 255, 136, 0.15); border: 2px solid #00ff88; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0;">
                         <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">PREMIO A RECEBER</p>
                         <p style="margin: 8px 0; font-size: 2rem; font-weight: bold; color: #00ff88;">${premio.toLocaleString('pt-MZ')} MTN</p>
                     </div>
-                `;
 
-                if (!aposta.pago) {
-                    html += `
-                        <button onclick="pagarPremio('${aposta.id}', ${premio})" style="width: 100%; padding: 14px; background: #00ff88; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px;">
-                            💰 CONFIRMAR PAGAMENTO DE ${premio.toLocaleString('pt-MZ')} MTN
-                        </button>
-                    `;
-                } else {
-                    html += `<p style="color: #00ff88; text-align: center; font-weight: bold; font-size: 1.1rem; margin-top: 10px;">✅ PREMIO DE ${premio.toLocaleString('pt-MZ')} MTN JA FOI PAGO</p>`;
-                }
+                    <button onclick="pagarRecibo('${aposta.id}', ${premio})" style="width: 100%; padding: 14px; background: #00ff88; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px;">
+                        💰 PAGAR RECIBO - ${premio.toLocaleString('pt-MZ')} MTN
+                    </button>
+
+                    <p style="color: var(--text-muted); font-size: 0.8rem; text-align: center; margin-top: 8px;">
+                        ⚠️ Apos pagar, este recibo nao podera ser usado novamente
+                    </p>
+                `;
+            } else if (ganhou && jaPago) {
+                // JA FOI PAGO - MOSTRAR DATA
+                html += `
+                    <div style="background: rgba(74, 74, 255, 0.15); border: 2px solid #4a4aff; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0;">
+                        <p style="margin: 0; font-size: 0.9rem; color: #4a4aff;">✅ PREMIO JA FOI PAGO</p>
+                        <p style="margin: 5px 0; font-size: 1.2rem; font-weight: bold; color: #4a4aff;">${premio.toLocaleString('pt-MZ')} MTN</p>
+                        ${aposta.dataPagamento ? `<p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Data: ${new Date(aposta.dataPagamento).toLocaleString('pt-MZ')}</p>` : ''}
+                    </div>
+                    <p style="color: #ff4a4a; text-align: center; font-weight: bold; margin-top: 10px;">🚫 RECIBO INVALIDO - JA UTILIZADO</p>
+                `;
             } else {
+                // SEM PREMIO
                 html += `
                     <div style="background: rgba(255, 74, 74, 0.1); border: 2px solid #ff4a4a; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0;">
                         <p style="margin: 0; font-size: 1rem; color: #ff4a4a;">Nao houve premio nesta aposta.</p>
-                        <p style="margin: 5px 0; font-size: 0.85rem; color: var(--text-muted);">Acertou ${numAcertos} numero(s). Para chance ${aposta.chance}, e necessario pelo menos ${Object.keys(TABELA_PREMIOS[aposta.chance])[0]} acerto(s).</p>
+                        <p style="margin: 5px 0; font-size: 0.85rem; color: var(--text-muted);">Acertou ${numAcertos} numero(s). Minimo para premio: ${Object.keys(TABELA_PREMIOS[aposta.chance])[0]} acerto(s).</p>
                     </div>
                 `;
             }
@@ -824,23 +816,37 @@ function verificarRecibo() {
     });
 }
 
-function pagarPremio(idRecibo, valor) {
-    if (!confirm(`Confirmar pagamento de ${valor.toLocaleString('pt-MZ')} MTN?`)) return;
+// ============================================
+// PAGAR RECIBO - MARCA COMO PAGO NO FIREBASE
+// ============================================
+function pagarRecibo(idRecibo, valor) {
+    if (!confirm(`CONFIRMAR PAGAMENTO\n\nRecibo: ${idRecibo}\nValor: ${valor.toLocaleString('pt-MZ')} MTN\n\nApos pagar, este recibo ficara invalido para novos pagamentos.\n\nDeseja continuar?`)) {
+        return;
+    }
+
+    const agora = new Date().toISOString();
 
     db.ref(`mozlotto/apostas/${idRecibo}`).update({
         pago: true,
-        dataPagamento: new Date().toISOString(),
+        dataPagamento: agora,
         valorPago: valor
     }).then(() => {
+        // Atualizar total de premios pagos no sorteio
         db.ref(`mozlotto/apostas/${idRecibo}`).once('value', (snap) => {
             const aposta = snap.val();
             if (aposta) {
                 db.ref(`mozlotto/sorteios/${aposta.sorteioId}/totalPremiosPagos`).transaction(c => (c || 0) + valor);
             }
         });
-        alert(`✅ ${valor.toLocaleString('pt-MZ')} MTN pagos!`);
+
+        alert(`✅ PAGAMENTO CONFIRMADO!\n\n${valor.toLocaleString('pt-MZ')} MTN pagos.\nRecibo ${idRecibo} marcado como UTILIZADO.`);
+
+        // Recarregar verificacao para mostrar como pago
         verificarRecibo();
-    }).catch(err => alert('Erro: ' + err.message));
+
+    }).catch(err => {
+        alert('❌ Erro ao processar pagamento: ' + err.message);
+    });
 }
 
 // ============================================

@@ -1,6 +1,7 @@
 // ============================================
-// MOZLOTTOGANHA - APP.JS COMPLETO
+// MOZLOTTOGANHA - APP.JS COMPLETO (v2)
 // Sistema de Lotaria & P.O.S
+// CORREÇÃO: Impressão Bluetooth dividida em chunks
 // ============================================
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -141,10 +142,8 @@ function initSorteios() {
 }
 
 function selecionarSorteio(sorteioId) {
-    // Desselecionar anterior
     document.querySelectorAll('.sorteio-card').forEach(c => c.classList.remove('active'));
 
-    // Selecionar novo
     const card = document.getElementById(`card-${sorteioId}`);
     if (card.classList.contains('closed')) {
         alert('Este sorteio já foi realizado! Selecione um sorteio aberto.');
@@ -176,15 +175,12 @@ function atualizarInterfaceSorteios() {
 
         const sorteioData = estado.sorteios[config.id];
 
-        // Verificar se sorteio já foi realizado (tem resultado no Firebase)
         if (sorteioData && sorteioData.resultado && sorteioData.resultado.length === 5) {
-            // Sorteio já realizado
             card.classList.add('closed');
             card.classList.remove('active');
             statusEl.className = 'sorteio-status status-closed';
             statusEl.textContent = 'REALIZADO';
 
-            // Mostrar bolas sorteadas
             ballsEl.innerHTML = sorteioData.resultado.map(num => 
                 `<div class="ball">${String(num).padStart(2, '0')}</div>`
             ).join('');
@@ -192,19 +188,16 @@ function atualizarInterfaceSorteios() {
             countdownEl.textContent = 'SORTEIO COMPLETO';
             countdownEl.classList.remove('urgent');
 
-            // Se este era o selecionado, limpar seleção
             if (estado.sorteioSelecionado === config.id) {
                 estado.sorteioSelecionado = null;
                 document.getElementById('sorteioNome').textContent = 'Nenhum';
                 document.getElementById('sorteioHora').textContent = '--:--';
             }
         } else if (horaSorteio > agora) {
-            // Sorteio futuro - aberto para apostas
             card.classList.remove('closed');
             statusEl.className = 'sorteio-status status-open';
             statusEl.textContent = 'ABERTO';
 
-            // Calcular tempo restante
             const diff = horaSorteio - agora;
             const horas = Math.floor(diff / 3600000);
             const minutos = Math.floor((diff % 3600000) / 60000);
@@ -212,24 +205,20 @@ function atualizarInterfaceSorteios() {
 
             countdownEl.textContent = `Fecha em: ${String(horas).padStart(2,'0')}:${String(minutos).padStart(2,'0')}:${String(segundos).padStart(2,'0')}`;
 
-            // Urgente se faltam menos de 30 minutos
             if (diff < 1800000) {
                 countdownEl.classList.add('urgent');
             } else {
                 countdownEl.classList.remove('urgent');
             }
 
-            // Bolas placeholder
             ballsEl.innerHTML = Array(5).fill('<div class="ball-placeholder"></div>').join('');
         } else {
-            // Hora passou mas não tem resultado ainda - realizar sorteio automaticamente
             card.classList.remove('closed');
             statusEl.className = 'sorteio-status status-open';
             statusEl.textContent = 'SORTEANDO...';
             countdownEl.textContent = 'SORTEIO EM ANDAMENTO';
             countdownEl.classList.add('urgent');
 
-            // Realizar sorteio automaticamente
             realizarSorteio(config.id);
         }
     });
@@ -243,21 +232,18 @@ function startTimer() {
 }
 
 // ============================================
-// REALIZAR SORTEIO (GERAR 5 BOLAS ALEATÓRIAS)
+// REALIZAR SORTEIO
 // ============================================
 function realizarSorteio(sorteioId) {
-    // Verificar se já existe resultado para evitar duplicados
     db.ref(`mozlotto/sorteios/${sorteioId}/resultado`).once('value', (snapshot) => {
-        if (snapshot.exists()) return; // Já tem resultado
+        if (snapshot.exists()) return;
 
-        // Gerar 5 números únicos de 1 a 90
         const numeros = new Set();
         while (numeros.size < 5) {
             numeros.add(Math.floor(Math.random() * 90) + 1);
         }
         const resultado = Array.from(numeros).sort((a, b) => a - b);
 
-        // Salvar no Firebase
         const agora = new Date();
         db.ref(`mozlotto/sorteios/${sorteioId}`).set({
             resultado: resultado,
@@ -270,7 +256,6 @@ function realizarSorteio(sorteioId) {
     });
 }
 
-// Forçar realização manual (para testes)
 function forcarSorteio(sorteioId) {
     const numeros = new Set();
     while (numeros.size < 5) {
@@ -306,7 +291,6 @@ function initNumbersGrid() {
 function selectChance(chance) {
     estado.chanceSelecionada = chance;
 
-    // Atualizar botões visuais
     document.querySelectorAll('.chance-btn').forEach(btn => {
         btn.classList.remove('selected');
         if (parseInt(btn.dataset.chance) === chance) {
@@ -314,10 +298,8 @@ function selectChance(chance) {
         }
     });
 
-    // Atualizar texto máximo
     document.getElementById('maxSelect').textContent = chance;
 
-    // Se já tem mais números selecionados que o permitido, remover excesso
     if (estado.numerosSelecionados.length > chance) {
         estado.numerosSelecionados = estado.numerosSelecionados.slice(0, chance);
         atualizarNumerosSelecionados();
@@ -330,10 +312,8 @@ function toggleNumero(numero) {
     const index = estado.numerosSelecionados.indexOf(numero);
 
     if (index > -1) {
-        // Desselecionar
         estado.numerosSelecionados.splice(index, 1);
     } else {
-        // Selecionar (se não atingiu o limite)
         if (estado.numerosSelecionados.length < estado.chanceSelecionada) {
             estado.numerosSelecionados.push(numero);
             estado.numerosSelecionados.sort((a, b) => a - b);
@@ -347,13 +327,11 @@ function toggleNumero(numero) {
 }
 
 function atualizarNumerosSelecionados() {
-    // Atualizar grid visual
     document.querySelectorAll('.num-btn').forEach(btn => {
         const num = parseInt(btn.dataset.numero);
         btn.classList.toggle('selected', estado.numerosSelecionados.includes(num));
     });
 
-    // Atualizar display
     document.getElementById('selectedCount').textContent = estado.numerosSelecionados.length;
 
     const display = document.getElementById('selectedBalls');
@@ -392,9 +370,8 @@ function fazerAposta() {
 
     const config = SORTEOS_CONFIG.find(s => s.id === estado.sorteioSelecionado);
     const idRecibo = gerarIdRecibo();
-    const valorAposta = 5; // 5 MTN
+    const valorAposta = 5;
 
-    // Calcular prêmio potencial
     const multiplicadores = { 2: 40, 3: 100, 4: 300, 5: 1000 };
     const premioPotencial = valorAposta * multiplicadores[estado.chanceSelecionada];
 
@@ -412,12 +389,9 @@ function fazerAposta() {
         pago: false
     };
 
-    // Salvar no Firebase
     db.ref(`mozlotto/apostas/${idRecibo}`).set(aposta)
         .then(() => {
-            // Incrementar contador do sorteio
             db.ref(`mozlotto/sorteios/${estado.sorteioSelecionado}/totalApostas`).transaction(c => (c || 0) + 1);
-
             mostrarRecibo(aposta);
             clearSelection();
         })
@@ -472,7 +446,7 @@ function mostrarRecibo(aposta) {
                 <span>${aposta.sorteioHora}</span>
             </div>
             <div class="pos-divider">------------------------</div>
-            <div class="pos-section-title">NÚMEROS APOSTADOS</div>
+            <div class="pos-section-title">NUMEROS APOSTADOS</div>
             <div class="pos-balls-row">
                 ${aposta.numeros.map(n => `<div class="pos-ball">${String(n).padStart(2,'0')}</div>`).join('')}
             </div>
@@ -486,7 +460,7 @@ function mostrarRecibo(aposta) {
                 <div class="valor">${aposta.valor.toFixed(2)} MTN</div>
             </div>
             <div class="pos-valor-box" style="border-color: #00aa00;">
-                <div class="label">PRÊMIO POTENCIAL</div>
+                <div class="label">PREMIO POTENCIAL</div>
                 <div class="valor" style="color: #00aa00;">${aposta.premioPotencial.toFixed(2)} MTN</div>
             </div>
             <div class="pos-divider">------------------------</div>
@@ -496,8 +470,8 @@ function mostrarRecibo(aposta) {
             </div>
             <div class="pos-divider">========================</div>
             <div class="pos-footer">
-                <p>Guarde este recibo para verificação</p>
-                <p>Apresente em caso de prémio</p>
+                <p>Guarde este recibo para verificacao</p>
+                <p>Apresente em caso de premio</p>
                 <p>Suporte: 860407269</p>
                 <p>Islammocambique@gmail.com</p>
                 <p>BOA SORTE!</p>
@@ -555,30 +529,241 @@ function printScreen() {
     printWindow.document.close();
 }
 
-function printBluetooth() {
+// ============================================
+// IMPRESSAO BLUETOOTH CORRIGIDA
+// Divide em chunks de 512 bytes e usa ESC/POS
+// ============================================
+async function printBluetooth() {
     if (!navigator.bluetooth) {
-        alert('Web Bluetooth API não disponível neste navegador. Use Chrome/Edge no Android ou imprima via navegador.');
+        alert('Web Bluetooth API nao disponivel. Use Chrome/Edge no Android ou imprima via navegador.');
         return;
     }
 
-    navigator.bluetooth.requestDevice({
-        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-    })
-    .then(device => device.gatt.connect())
-    .then(server => server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'))
-    .then(service => service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'))
-    .then(characteristic => {
-        const recibo = document.getElementById('posReciboPrint');
-        const texto = recibo.innerText;
+    try {
+        // Comandos ESC/POS basicos
+        const ESC = 0x1B;
+        const GS = 0x1D;
+        const INIT = new Uint8Array([ESC, 0x40]); // Initialize printer
+        const CENTER = new Uint8Array([ESC, 0x61, 0x01]); // Center align
+        const LEFT = new Uint8Array([ESC, 0x61, 0x00]); // Left align
+        const BOLD_ON = new Uint8Array([ESC, 0x45, 0x01]); // Bold on
+        const BOLD_OFF = new Uint8Array([ESC, 0x45, 0x00]); // Bold off
+        const DOUBLE_ON = new Uint8Array([ESC, 0x21, 0x30]); // Double width/height
+        const DOUBLE_OFF = new Uint8Array([ESC, 0x21, 0x00]); // Normal
+        const CUT = new Uint8Array([GS, 0x56, 0x00]); // Cut paper
+        const FEED = new Uint8Array([ESC, 0x64, 0x03]); // Feed 3 lines
+        const LINE = new Uint8Array([0x0A]); // Line feed
+
+        const aposta = estado.ultimaAposta;
+        if (!aposta) {
+            alert('Nenhuma aposta recente para imprimir.');
+            return;
+        }
+
+        const multiplicadores = { 2: '40x', 3: '100x', 4: '300x', 5: '1000x' };
+        const data = new Date(aposta.dataAposta);
+        const dataStr = data.toLocaleDateString('pt-MZ');
+        const horaStr = data.toLocaleTimeString('pt-MZ');
+
+        // Construir conteudo do recibo em texto simples (sem acentos para compatibilidade)
+        const linhas = [
+            '    MOZLOTTOGANHA',
+            'Sistema de Lotaria & P.O.S',
+            '    Mocambique',
+            '========================',
+            '     RECIBO DE APOSTA',
+            '------------------------',
+            `ID: ${aposta.id}`,
+            `Data: ${dataStr} ${horaStr}`,
+            '------------------------',
+            `SORTEIO: ${aposta.sorteioNome}`,
+            `Hora: ${aposta.sorteioHora}`,
+            '------------------------',
+            '    NUMEROS APOSTADOS',
+            `    ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(' ')}`,
+            `Chance: ${aposta.chance} (${multiplicadores[aposta.chance]})`,
+            '------------------------',
+            '   VALOR DA APOSTA',
+            `   ${aposta.valor.toFixed(2)} MTN`,
+            '',
+            '   PREMIO POTENCIAL',
+            `   ${aposta.premioPotencial.toFixed(2)} MTN`,
+            '------------------------',
+            `Cod: ${aposta.id}`,
+            '========================',
+            'Guarde este recibo',
+            'Apresente em caso de premio',
+            'Suporte: 860407269',
+            'Islammocambique@gmail.com',
+            '      BOA SORTE!',
+            ''
+        ];
+
+        // Converter para bytes
         const encoder = new TextEncoder();
-        return characteristic.writeValue(encoder.encode(texto + '\n\n\n'));
-    })
-    .then(() => alert('Recibo enviado para impressora Bluetooth!'))
-    .catch(err => {
+        let allBytes = new Uint8Array(0);
+
+        // Adicionar init
+        allBytes = concatBytes(allBytes, INIT);
+        allBytes = concatBytes(allBytes, CENTER);
+        allBytes = concatBytes(allBytes, BOLD_ON);
+        allBytes = concatBytes(allBytes, DOUBLE_ON);
+        allBytes = concatBytes(allBytes, encoder.encode('MOZLOTTOGANHA'));
+        allBytes = concatBytes(allBytes, DOUBLE_OFF);
+        allBytes = concatBytes(allBytes, BOLD_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Sistema de Lotaria & P.O.S'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Mocambique'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('========================'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, BOLD_ON);
+        allBytes = concatBytes(allBytes, encoder.encode('RECIBO DE APOSTA'));
+        allBytes = concatBytes(allBytes, BOLD_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, LEFT);
+        allBytes = concatBytes(allBytes, encoder.encode(`ID: ${aposta.id}`));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode(`Data: ${dataStr} ${horaStr}`));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, BOLD_ON);
+        allBytes = concatBytes(allBytes, encoder.encode(`SORTEIO: ${aposta.sorteioNome}`));
+        allBytes = concatBytes(allBytes, BOLD_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode(`Hora: ${aposta.sorteioHora}`));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, CENTER);
+        allBytes = concatBytes(allBytes, encoder.encode('NUMEROS APOSTADOS'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, DOUBLE_ON);
+        allBytes = concatBytes(allBytes, encoder.encode(aposta.numeros.map(n => String(n).padStart(2,'0')).join(' ')));
+        allBytes = concatBytes(allBytes, DOUBLE_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode(`Chance ${aposta.chance} (${multiplicadores[aposta.chance]})`));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, encoder.encode('VALOR DA APOSTA'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, DOUBLE_ON);
+        allBytes = concatBytes(allBytes, encoder.encode(`${aposta.valor.toFixed(2)} MTN`));
+        allBytes = concatBytes(allBytes, DOUBLE_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, encoder.encode('PREMIO POTENCIAL'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, DOUBLE_ON);
+        allBytes = concatBytes(allBytes, encoder.encode(`${aposta.premioPotencial.toFixed(2)} MTN`));
+        allBytes = concatBytes(allBytes, DOUBLE_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('------------------------'));
+        allBytes = concatBytes(allBytes, LINE);
+
+        allBytes = concatBytes(allBytes, encoder.encode(`Cod: ${aposta.id}`));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('========================'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Guarde este recibo'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Apresente em caso de premio'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Suporte: 860407269'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, encoder.encode('Islammocambique@gmail.com'));
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, BOLD_ON);
+        allBytes = concatBytes(allBytes, DOUBLE_ON);
+        allBytes = concatBytes(allBytes, encoder.encode('BOA SORTE!'));
+        allBytes = concatBytes(allBytes, DOUBLE_OFF);
+        allBytes = concatBytes(allBytes, BOLD_OFF);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, LINE);
+        allBytes = concatBytes(allBytes, FEED);
+        allBytes = concatBytes(allBytes, CUT);
+
+        // Conectar a impressora
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+                { namePrefix: 'Printer' },
+                { namePrefix: 'POS' },
+                { namePrefix: 'Bluetooth' }
+            ],
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000ff00-0000-1000-8000-00805f9b34fb']
+        });
+
+        const server = await device.gatt.connect();
+
+        // Tentar diferentes servicos e caracteristicas comuns em impressoras termicas
+        const servicesToTry = [
+            '000018f0-0000-1000-8000-00805f9b34fb',
+            'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+            '0000ff00-0000-1000-8000-00805f9b34fb'
+        ];
+
+        const characteristicsToTry = [
+            '00002af1-0000-1000-8000-00805f9b34fb',
+            'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+            '0000ff02-0000-1000-8000-00805f9b34fb'
+        ];
+
+        let characteristic = null;
+
+        for (const serviceUUID of servicesToTry) {
+            try {
+                const service = await server.getPrimaryService(serviceUUID);
+                for (const charUUID of characteristicsToTry) {
+                    try {
+                        characteristic = await service.getCharacteristic(charUUID);
+                        break;
+                    } catch (e) {}
+                }
+                if (characteristic) break;
+            } catch (e) {}
+        }
+
+        if (!characteristic) {
+            throw new Error('Nao foi possivel encontrar a caracteristica de impressao. Tente outra impressora.');
+        }
+
+        // Enviar em chunks de 500 bytes (deixando margem de seguranca)
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
+            const chunk = allBytes.slice(i, i + CHUNK_SIZE);
+            await characteristic.writeValue(chunk);
+            // Pequena pausa entre chunks para a impressora processar
+            await new Promise(r => setTimeout(r, 100));
+        }
+
+        alert('Recibo enviado para impressora Bluetooth com sucesso!');
+
+    } catch (err) {
         console.error('Erro Bluetooth:', err);
-        alert('Erro ao conectar impressora Bluetooth: ' + err.message);
-    });
+        alert('Erro ao imprimir: ' + err.message + '\n\nTente usar "Imprimir via Navegador (P.O.S)" como alternativa.');
+    }
+}
+
+// Funcao auxiliar para concatenar Uint8Arrays
+function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a, 0);
+    result.set(b, a.length);
+    return result;
 }
 
 // ============================================
@@ -600,39 +785,36 @@ function verificarRecibo() {
         const aposta = snapshot.val();
 
         if (!aposta) {
-            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo não encontrado! Verifique o ID.</p>';
+            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo nao encontrado! Verifique o ID.</p>';
             return;
         }
 
-        // Buscar resultado do sorteio
+        // Guardar aposta para impressao
+        estado.ultimaAposta = aposta;
+
         db.ref(`mozlotto/sorteios/${aposta.sorteioId}/resultado`).once('value', (resSnapshot) => {
             const resultado = resSnapshot.val();
 
             if (!resultado) {
-                // Sorteio ainda não realizado
                 resultDiv.innerHTML = `
                     <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid #252545;">
-                        <h4 style="color: var(--accent); margin-top: 0;">📋 RECIBO VÁLIDO</h4>
+                        <h4 style="color: var(--accent); margin-top: 0;">📋 RECIBO VALIDO</h4>
                         <p><strong>ID:</strong> ${aposta.id}</p>
                         <p><strong>Sorteio:</strong> ${aposta.sorteioNome} (${aposta.sorteioHora})</p>
-                        <p><strong>Números:</strong> ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ')}</p>
+                        <p><strong>Numeros:</strong> ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ')}</p>
                         <p><strong>Chance:</strong> ${aposta.chance}</p>
                         <p><strong>Valor:</strong> ${aposta.valor.toFixed(2)} MTN</p>
                         <p><strong>Status:</strong> <span style="color: #f4c430;">⏳ Aguardando sorteio</span></p>
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">O sorteio ainda não foi realizado. Volte após ${aposta.sorteioHora}.</p>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">O sorteio ainda nao foi realizado. Volte apos ${aposta.sorteioHora}.</p>
                     </div>
                 `;
                 return;
             }
 
-            // Verificar acertos
             const acertos = aposta.numeros.filter(n => resultado.includes(n));
             const numAcertos = acertos.length;
-
-            // Determinar se ganhou (deve acertar todos os números da chance)
             const ganhou = numAcertos >= aposta.chance;
 
-            // Calcular prêmio
             let premio = 0;
             if (ganhou) {
                 const multiplicadores = { 2: 40, 3: 100, 4: 300, 5: 1000 };
@@ -640,7 +822,7 @@ function verificarRecibo() {
             }
 
             const statusColor = ganhou ? '#00ff88' : (numAcertos > 0 ? '#f4c430' : '#ff4a4a');
-            const statusText = ganhou ? '🎉 GANHADOR!' : (numAcertos > 0 ? `⚠️ Acertou ${numAcertos} número(s)` : '❌ Não foi desta vez');
+            const statusText = ganhou ? '🎉 GANHADOR!' : (numAcertos > 0 ? `⚠️ Acertou ${numAcertos} numero(s)` : '❌ Nao foi desta vez');
 
             let html = `
                 <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid ${statusColor};">
@@ -648,7 +830,7 @@ function verificarRecibo() {
                     <p><strong>ID:</strong> ${aposta.id}</p>
                     <p><strong>Sorteio:</strong> ${aposta.sorteioNome}</p>
                     <div style="margin: 10px 0;">
-                        <p style="margin: 5px 0;"><strong>Números Sorteados:</strong></p>
+                        <p style="margin: 5px 0;"><strong>Numeros Sorteados:</strong></p>
                         <div style="display: flex; gap: 5px; justify-content: center;">
                             ${resultado.map(n => {
                                 const acertou = aposta.numeros.includes(n);
@@ -657,7 +839,7 @@ function verificarRecibo() {
                         </div>
                     </div>
                     <div style="margin: 10px 0;">
-                        <p style="margin: 5px 0;"><strong>Seus Números:</strong></p>
+                        <p style="margin: 5px 0;"><strong>Seus Numeros:</strong></p>
                         <div style="display: flex; gap: 5px; justify-content: center;">
                             ${aposta.numeros.map(n => {
                                 const acertou = resultado.includes(n);
@@ -665,13 +847,13 @@ function verificarRecibo() {
                             }).join('')}
                         </div>
                     </div>
-                    <p><strong>Acertos:</strong> ${numAcertos} de ${aposta.chance} necessários</p>
+                    <p><strong>Acertos:</strong> ${numAcertos} de ${aposta.chance} necessarios</p>
             `;
 
             if (ganhou) {
                 html += `
                     <div style="background: rgba(0, 255, 136, 0.1); border: 2px solid #00ff88; padding: 10px; border-radius: 6px; text-align: center; margin: 10px 0;">
-                        <p style="margin: 0; font-size: 0.9rem;">PRÊMIO A RECEBER</p>
+                        <p style="margin: 0; font-size: 0.9rem;">PREMIO A RECEBER</p>
                         <p style="margin: 5px 0; font-size: 1.5rem; font-weight: bold; color: #00ff88;">${premio.toFixed(2)} MTN</p>
                     </div>
                 `;
@@ -679,11 +861,11 @@ function verificarRecibo() {
                 if (!aposta.pago) {
                     html += `
                         <button onclick="pagarPremio('${aposta.id}', ${premio})" style="width: 100%; padding: 12px; background: #00ff88; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;">
-                            💰 CONFIRMAR PAGAMENTO DO PRÊMIO
+                            💰 CONFIRMAR PAGAMENTO DO PREMIO
                         </button>
                     `;
                 } else {
-                    html += `<p style="color: #00ff88; text-align: center; font-weight: bold;">✅ PRÊMIO JÁ PAGO</p>`;
+                    html += `<p style="color: #00ff88; text-align: center; font-weight: bold;">✅ PREMIO JA PAGO</p>`;
                 }
             }
 
@@ -703,7 +885,6 @@ function pagarPremio(idRecibo, valor) {
         dataPagamento: new Date().toISOString(),
         valorPago: valor
     }).then(() => {
-        // Incrementar total de prémios do sorteio
         db.ref(`mozlotto/apostas/${idRecibo}`).once('value', (snap) => {
             const aposta = snap.val();
             if (aposta) {
@@ -711,24 +892,22 @@ function pagarPremio(idRecibo, valor) {
             }
         });
 
-        alert(`✅ Prémio de ${valor.toFixed(2)} MTN pago com sucesso!`);
-        verificarRecibo(); // Recarregar verificação
+        alert(`✅ Premio de ${valor.toFixed(2)} MTN pago com sucesso!`);
+        verificarRecibo();
     }).catch(err => {
         alert('Erro ao processar pagamento: ' + err.message);
     });
 }
 
 // ============================================
-// FUNÇÕES DE UTILIDADE
+// FUNCOES DE UTILIDADE
 // ============================================
-// Fechar modal ao clicar fora
 document.getElementById('modalRecibo').addEventListener('click', (e) => {
     if (e.target === document.getElementById('modalRecibo')) {
         closeModal();
     }
 });
 
-// Tecla ESC fecha modal
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
 });

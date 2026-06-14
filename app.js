@@ -1,16 +1,8 @@
 // ============================================
-// MOZLOTTOGANHA - APP.JS CORRIGIDO (v8 → v9 compat)
-// Com Login E-mail + PIN, Saldo Obrigatorio
-// Recarga via Suporte: 860407269 - Anacleto
+// MOZLOTTOGANHA - APP.JS CORRIGIDO (v8)
+// RESET DIARIO DOS SORTEIOS - Resultados expiram a meia-noite
 // ============================================
 
-// Importar Firebase v9 compat (ou usar script tags com compat)
-// Se estiver usando modules: import firebase from 'firebase/compat/app';
-// Se estiver usando CDN: <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-
-// ============================================
-// CONFIGURACOES FIREBASE
-// ============================================
 const firebaseConfig = {
     apiKey: "AIzaSyCW9ZZadm4WJ_FKtOjvkP1czsfImwzl98c",
     authDomain: "mozcoin.firebaseapp.com",
@@ -22,18 +14,15 @@ const firebaseConfig = {
     measurementId: "G-9KCS6TG1CZ"
 };
 
-// Inicializar Firebase (v9 compat)
-if (!firebase.apps.length) {
+// Inicializar Firebase apenas se não estiver inicializado
+if (!firebase.apps || !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
-} else {
-    firebase.app(); // se já estiver inicializado
 }
-
 const db = firebase.database();
 const auth = firebase.auth();
 
 // ============================================
-// CONFIGURACOES DO JOGO
+// CONFIGURACOES
 // ============================================
 const CUSTO_APOSTA = 5;
 const SUPORTE_TELEFONE = "860407269";
@@ -70,6 +59,31 @@ let estado = {
 };
 
 // ============================================
+// FUNCOES UTILITARIAS - DATA E HORA
+// ============================================
+
+function getHojeString() {
+    const agora = new Date();
+    return agora.getFullYear() + '-' + String(agora.getMonth() + 1).padStart(2, '0') + '-' + String(agora.getDate()).padStart(2, '0');
+}
+
+function getDataSorteio(horaStr) {
+    const [hora, minuto] = horaStr.split(':').map(Number);
+    const data = new Date();
+    data.setHours(hora, minuto, 0, 0);
+    return data;
+}
+
+function sorteioEhDeHoje(sorteioData) {
+    if (!sorteioData || !sorteioData.dataRealizacao) return false;
+    const dataRealizacao = new Date(sorteioData.dataRealizacao);
+    const hoje = new Date();
+    return dataRealizacao.getDate() === hoje.getDate() &&
+           dataRealizacao.getMonth() === hoje.getMonth() &&
+           dataRealizacao.getFullYear() === hoje.getFullYear();
+}
+
+// ============================================
 // INICIALIZACAO
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -78,23 +92,62 @@ document.addEventListener('DOMContentLoaded', () => {
     initNumbersGrid();
     startTimer();
     verificarSessao();
+    limparSorteiosAntigos(); // Limpa resultados antigos ao carregar
 
     db.ref('mozlotto/sorteios').on('value', (snapshot) => {
         estado.sorteios = snapshot.val() || {};
         atualizarInterfaceSorteios();
     });
 
-    // Evento click fora do modal
-    const modalRecibo = document.getElementById('modalRecibo');
-    if (modalRecibo) {
-        modalRecibo.addEventListener('click', (e) => {
-            if (e.target === modalRecibo) closeModal();
-        });
-    }
+    document.getElementById('modalRecibo').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('modalRecibo')) closeModal();
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
     });
 });
+
+// ============================================
+// LIMPAR SORTEIOS ANTIGOS (RESET DIARIO)
+// ============================================
+async function limparSorteiosAntigos() {
+    try {
+        const snapshot = await db.ref('mozlotto/sorteios').once('value');
+        const sorteios = snapshot.val() || {};
+        const hoje = getHojeString();
+        let atualizacoes = {};
+
+        for (let sorteioId in sorteios) {
+            const sorteio = sorteios[sorteioId];
+            if (sorteio && sorteio.dataRealizacao) {
+                const dataRealizacao = new Date(sorteio.dataRealizacao);
+                const dataHoje = new Date();
+
+                // Se o resultado é de ontem ou antes, limpar
+                if (dataRealizacao.getDate() !== dataHoje.getDate() ||
+                    dataRealizacao.getMonth() !== dataHoje.getMonth() ||
+                    dataRealizacao.getFullYear() !== dataHoje.getFullYear()) {
+
+                    // Limpar resultado para permitir novo sorteio hoje
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/resultado`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/dataRealizacao`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/totalArrecadado`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/maxPremios`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/totalPremios`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/totalApostas`] = null;
+                    atualizacoes[`mozlotto/sorteios/${sorteioId}/totalPremiosPagos`] = null;
+                }
+            }
+        }
+
+        if (Object.keys(atualizacoes).length > 0) {
+            await db.ref().update(atualizacoes);
+            console.log('Sorteios antigos limpos com sucesso!');
+        }
+    } catch (error) {
+        console.error('Erro ao limpar sorteios antigos:', error);
+    }
+}
 
 // ============================================
 // AUTENTICACAO - LOGIN / REGISTO
@@ -106,8 +159,7 @@ function mostrarTab(tab) {
 
     const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
     if (tabBtn) tabBtn.classList.add('active');
-    const tabElement = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-    if (tabElement) tabElement.classList.add('active');
+    document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
 }
 
 async function fazerRegisto() {
@@ -156,7 +208,6 @@ async function fazerRegisto() {
         mostrarNotificacao('Conta criada! Faca login.', 'sucesso');
         mostrarTab('login');
 
-        // Limpar form
         document.getElementById('regNome').value = '';
         document.getElementById('regEmail').value = '';
         document.getElementById('regTelefone').value = '';
@@ -168,10 +219,7 @@ async function fazerRegisto() {
         if (error.code === 'auth/email-already-in-use') mensagem = 'Este e-mail ja esta registado!';
         else if (error.code === 'auth/invalid-email') mensagem = 'E-mail invalido!';
         else if (error.code === 'auth/weak-password') mensagem = 'PIN muito fraco!';
-        else if (error.code === 'auth/invalid-credential') mensagem = 'Credenciais invalidas!';
-        else if (error.message) mensagem = error.message;
         mostrarNotificacao(mensagem, 'erro');
-        console.error('Erro registo:', error);
     }
 }
 
@@ -215,23 +263,16 @@ async function fazerLogin() {
         else if (error.code === 'auth/wrong-password') mensagem = 'PIN incorreto!';
         else if (error.code === 'auth/invalid-email') mensagem = 'E-mail invalido!';
         else if (error.code === 'auth/too-many-requests') mensagem = 'Muitas tentativas. Tente mais tarde.';
-        else if (error.code === 'auth/invalid-credential') mensagem = 'E-mail ou PIN incorretos!';
-        else if (error.message) mensagem = error.message;
         mostrarNotificacao(mensagem, 'erro');
-        console.error('Erro login:', error);
     }
 }
 
 async function fazerLogout() {
-    try {
-        await auth.signOut();
-        estado.usuario = null;
-        document.getElementById('authSection').classList.remove('hidden');
-        document.getElementById('appSection').classList.add('hidden');
-        mostrarNotificacao('Sessao terminada.', 'info');
-    } catch (error) {
-        console.error('Erro logout:', error);
-    }
+    await auth.signOut();
+    estado.usuario = null;
+    document.getElementById('authSection').classList.remove('hidden');
+    document.getElementById('appSection').classList.add('hidden');
+    mostrarNotificacao('Sessao terminada.', 'info');
 }
 
 async function recuperarConta() {
@@ -246,28 +287,16 @@ async function recuperarConta() {
         mostrarNotificacao('E-mail de recuperacao enviado!', 'sucesso');
         mostrarTab('login');
     } catch (error) {
-        let mensagem = 'E-mail nao encontrado!';
-        if (error.code === 'auth/invalid-email') mensagem = 'E-mail invalido!';
-        mostrarNotificacao(mensagem, 'erro');
+        mostrarNotificacao('E-mail nao encontrado!', 'erro');
     }
 }
 
 function verificarSessao() {
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            try {
-                const snapshot = await db.ref(`mozlotto/usuarios/${user.uid}`).once('value');
-                estado.usuario = snapshot.val() || { 
-                    uid: user.uid, 
-                    email: user.email, 
-                    nome: user.displayName || 'Usuario', 
-                    saldo: 0 
-                };
-                mostrarApp();
-            } catch (error) {
-                console.error('Erro ao verificar sessao:', error);
-                estado.usuario = null;
-            }
+            const snapshot = await db.ref(`mozlotto/usuarios/${user.uid}`).once('value');
+            estado.usuario = snapshot.val() || { uid: user.uid, email: user.email, nome: user.displayName || 'Usuario', saldo: 0 };
+            mostrarApp();
         } else {
             estado.usuario = null;
         }
@@ -277,47 +306,37 @@ function verificarSessao() {
 function mostrarApp() {
     if (!estado.usuario) return;
 
-    const userNome = document.getElementById('userNome');
-    const userSaldo = document.getElementById('userSaldo');
-    const saldoAviso = document.getElementById('saldoAviso');
-    const authSection = document.getElementById('authSection');
-    const appSection = document.getElementById('appSection');
-
-    if (userNome) userNome.textContent = estado.usuario.nome || estado.usuario.email;
-    if (userSaldo) userSaldo.textContent = (estado.usuario.saldo || 0).toFixed(2) + ' MTN';
+    document.getElementById('userNome').textContent = estado.usuario.nome || estado.usuario.email;
+    document.getElementById('userSaldo').textContent = (estado.usuario.saldo || 0).toFixed(2) + ' MTN';
 
     const saldo = estado.usuario.saldo || 0;
+    const saldoEl = document.getElementById('userSaldo');
     if (saldo < CUSTO_APOSTA) {
-        if (userSaldo) userSaldo.style.color = '#ff4a4a';
-        if (saldoAviso) saldoAviso.classList.remove('hidden');
+        saldoEl.style.color = '#ff4a4a';
+        document.getElementById('saldoAviso').classList.remove('hidden');
     } else {
-        if (userSaldo) userSaldo.style.color = '#00ff88';
-        if (saldoAviso) saldoAviso.classList.add('hidden');
+        saldoEl.style.color = '#00ff88';
+        document.getElementById('saldoAviso').classList.add('hidden');
     }
 
-    if (authSection) authSection.classList.add('hidden');
-    if (appSection) appSection.classList.remove('hidden');
+    document.getElementById('authSection').classList.add('hidden');
+    document.getElementById('appSection').classList.remove('hidden');
 }
 
 async function atualizarSaldoLocal() {
     if (!estado.usuario) return;
-    try {
-        const snap = await db.ref(`mozlotto/usuarios/${estado.usuario.uid}/saldo`).once('value');
-        estado.usuario.saldo = snap.val() || 0;
-        const userSaldo = document.getElementById('userSaldo');
-        const saldoAviso = document.getElementById('saldoAviso');
-        if (userSaldo) userSaldo.textContent = estado.usuario.saldo.toFixed(2) + ' MTN';
+    const snap = await db.ref(`mozlotto/usuarios/${estado.usuario.uid}/saldo`).once('value');
+    estado.usuario.saldo = snap.val() || 0;
+    document.getElementById('userSaldo').textContent = estado.usuario.saldo.toFixed(2) + ' MTN';
 
-        const saldo = estado.usuario.saldo;
-        if (saldo < CUSTO_APOSTA) {
-            if (userSaldo) userSaldo.style.color = '#ff4a4a';
-            if (saldoAviso) saldoAviso.classList.remove('hidden');
-        } else {
-            if (userSaldo) userSaldo.style.color = '#00ff88';
-            if (saldoAviso) saldoAviso.classList.add('hidden');
-        }
-    } catch (error) {
-        console.error('Erro ao atualizar saldo:', error);
+    const saldo = estado.usuario.saldo;
+    const saldoEl = document.getElementById('userSaldo');
+    if (saldo < CUSTO_APOSTA) {
+        saldoEl.style.color = '#ff4a4a';
+        document.getElementById('saldoAviso').classList.remove('hidden');
+    } else {
+        saldoEl.style.color = '#00ff88';
+        document.getElementById('saldoAviso').classList.add('hidden');
     }
 }
 
@@ -326,10 +345,6 @@ async function atualizarSaldoLocal() {
 // ============================================
 function mostrarNotificacao(mensagem, tipo) {
     const notif = document.getElementById('notificacao');
-    if (!notif) {
-        console.warn('Elemento notificacao nao encontrado');
-        return;
-    }
     notif.textContent = mensagem;
     notif.className = 'notificacao ' + tipo;
     notif.classList.add('show');
@@ -343,11 +358,10 @@ function mostrarNotificacao(mensagem, tipo) {
 // PARTICULAS
 // ============================================
 function initParticles() {
-    const container = document.getElementById('particles');
-    if (!container) return;
-    
     const canvas = document.createElement('canvas');
     canvas.id = 'particleCanvas';
+    const container = document.getElementById('particles');
+    if (!container) return;
     container.appendChild(canvas);
     const ctx = canvas.getContext('2d');
     let particles = [];
@@ -387,7 +401,7 @@ function initParticles() {
 }
 
 // ============================================
-// SORTEIOS
+// SORTEIOS - COM RESET DIARIO
 // ============================================
 function initSorteios() {
     const grid = document.getElementById('sorteosGrid');
@@ -437,8 +451,6 @@ function selecionarSorteio(sorteioId) {
     document.querySelectorAll('.sorteio-card').forEach(c => c.classList.remove('active'));
 
     const card = document.getElementById(`card-${sorteioId}`);
-    if (!card) return;
-    
     if (card.classList.contains('closed')) {
         mostrarNotificacao('Este sorteio ja foi realizado!', 'erro');
         return;
@@ -452,17 +464,15 @@ function selecionarSorteio(sorteioId) {
     estado.sorteioSelecionado = sorteioId;
 
     const config = SORTEOS_CONFIG.find(s => s.id === sorteioId);
-    if (config) {
-        const sorteioNome = document.getElementById('sorteioNome');
-        const sorteioHora = document.getElementById('sorteioHora');
-        if (sorteioNome) sorteioNome.textContent = config.nome;
-        if (sorteioHora) sorteioHora.textContent = config.hora;
-    }
+    document.getElementById('sorteioNome').textContent = config.nome;
+    document.getElementById('sorteioHora').textContent = config.hora;
     atualizarBotaoApostar();
 }
 
 function atualizarInterfaceSorteios() {
     const agora = new Date();
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
 
     SORTEOS_CONFIG.forEach(config => {
         const [hora, minuto] = config.hora.split(':').map(Number);
@@ -476,12 +486,18 @@ function atualizarInterfaceSorteios() {
         const ballsEl = document.getElementById(`balls-${config.id}`);
         const countdownEl = document.getElementById(`countdown-${config.id}`);
 
-        if (!card || !statusEl || !ballsEl || !countdownEl) return;
+        if (!card) return;
 
         const sorteioData = estado.sorteios[config.id];
 
-        // Sorteio ja realizado
-        if (sorteioData && sorteioData.resultado && sorteioData.resultado.length === 5) {
+        // VERIFICACAO CRITICA: O resultado é de hoje?
+        const resultadoValido = sorteioData && 
+                              sorteioData.resultado && 
+                              sorteioData.resultado.length === 5 &&
+                              sorteioEhDeHoje(sorteioData);
+
+        // Sorteio ja realizado HOJE
+        if (resultadoValido) {
             card.classList.add('closed');
             card.classList.remove('active', 'locked');
             statusEl.className = 'sorteio-status status-closed';
@@ -496,12 +512,15 @@ function atualizarInterfaceSorteios() {
 
             if (estado.sorteioSelecionado === config.id) {
                 estado.sorteioSelecionado = null;
-                const sorteioNome = document.getElementById('sorteioNome');
-                const sorteioHora = document.getElementById('sorteioHora');
-                if (sorteioNome) sorteioNome.textContent = 'Nenhum';
-                if (sorteioHora) sorteioHora.textContent = '--:--';
+                document.getElementById('sorteioNome').textContent = 'Nenhum';
+                document.getElementById('sorteioHora').textContent = '--:--';
             }
             return;
+        }
+
+        // Se tem resultado mas é de outro dia, mostrar como ABERTO (resetado)
+        if (sorteioData && sorteioData.resultado && !sorteioEhDeHoje(sorteioData)) {
+            // Nao faz nada aqui, cai no fluxo normal abaixo
         }
 
         // Apostas encerradas (menos de 15 minutos)
@@ -521,10 +540,8 @@ function atualizarInterfaceSorteios() {
 
             if (estado.sorteioSelecionado === config.id) {
                 estado.sorteioSelecionado = null;
-                const sorteioNome = document.getElementById('sorteioNome');
-                const sorteioHora = document.getElementById('sorteioHora');
-                if (sorteioNome) sorteioNome.textContent = 'Nenhum';
-                if (sorteioHora) sorteioHora.textContent = '--:--';
+                document.getElementById('sorteioNome').textContent = 'Nenhum';
+                document.getElementById('sorteioHora').textContent = '--:--';
             }
             return;
         }
@@ -545,14 +562,24 @@ function atualizarInterfaceSorteios() {
 
             ballsEl.innerHTML = Array(5).fill('<div class="ball-placeholder"></div>').join('');
         } else {
-            // Hora passou - realizar sorteio
-            card.classList.remove('closed', 'locked');
-            statusEl.className = 'sorteio-status status-open';
-            statusEl.textContent = 'SORTEANDO...';
-            countdownEl.textContent = 'SORTEIO EM ANDAMENTO';
-            countdownEl.classList.add('urgent');
+            // Hora passou - realizar sorteio (mas só se ainda não foi realizado hoje)
+            if (!resultadoValido) {
+                card.classList.remove('closed', 'locked');
+                statusEl.className = 'sorteio-status status-open';
+                statusEl.textContent = 'SORTEANDO...';
+                countdownEl.textContent = 'SORTEIO EM ANDAMENTO';
+                countdownEl.classList.add('urgent');
 
-            realizarSorteioInteligente(config.id);
+                // Evitar chamadas múltiplas simultâneas
+                if (!card.dataset.sorteando) {
+                    card.dataset.sorteando = 'true';
+                    realizarSorteioInteligente(config.id).then(() => {
+                        card.dataset.sorteando = '';
+                    }).catch(() => {
+                        card.dataset.sorteando = '';
+                    });
+                }
+            }
         }
     });
 }
@@ -568,7 +595,11 @@ function startTimer() {
 async function realizarSorteioInteligente(sorteioId) {
     try {
         const snap = await db.ref(`mozlotto/sorteios/${sorteioId}/resultado`).once('value');
-        if (snap.exists()) return;
+        if (snap.exists()) {
+            // Verificar se já foi realizado hoje
+            const sorteioData = await db.ref(`mozlotto/sorteios/${sorteioId}`).once('value');
+            if (sorteioEhDeHoje(sorteioData.val())) return;
+        }
 
         const apostasSnap = await db.ref('mozlotto/apostas').orderByChild('sorteioId').equalTo(sorteioId).once('value');
         const apostas = apostasSnap.val() || {};
@@ -623,7 +654,7 @@ async function realizarSorteioInteligente(sorteioId) {
             totalApostas: listaApostas.length
         });
     } catch (error) {
-        console.error('Erro no sorteio inteligente:', error);
+        console.error('Erro no sorteio:', error);
     }
 }
 
@@ -653,8 +684,7 @@ function selectChance(chance) {
     document.querySelectorAll('.chance-btn').forEach(btn => {
         btn.classList.toggle('selected', parseInt(btn.dataset.chance) === chance);
     });
-    const maxSelect = document.getElementById('maxSelect');
-    if (maxSelect) maxSelect.textContent = chance;
+    document.getElementById('maxSelect').textContent = chance;
 
     if (estado.numerosSelecionados.length > chance) {
         estado.numerosSelecionados = estado.numerosSelecionados.slice(0, chance);
@@ -696,14 +726,10 @@ function atualizarNumerosSelecionados() {
         const num = parseInt(btn.dataset.numero);
         btn.classList.toggle('selected', estado.numerosSelecionados.includes(num));
     });
-    const selectedCount = document.getElementById('selectedCount');
-    const selectedBalls = document.getElementById('selectedBalls');
-    if (selectedCount) selectedCount.textContent = estado.numerosSelecionados.length;
-    if (selectedBalls) {
-        selectedBalls.innerHTML = estado.numerosSelecionados.map(num => 
-            `<div class="selected-ball">${String(num).padStart(2, '0')}</div>`
-        ).join('');
-    }
+    document.getElementById('selectedCount').textContent = estado.numerosSelecionados.length;
+    document.getElementById('selectedBalls').innerHTML = estado.numerosSelecionados.map(num => 
+        `<div class="selected-ball">${String(num).padStart(2, '0')}</div>`
+    ).join('');
     atualizarBotaoApostar();
 }
 
@@ -714,7 +740,6 @@ function clearSelection() {
 
 function atualizarBotaoApostar() {
     const btn = document.getElementById('btnApostar');
-    if (!btn) return;
     const saldoOk = estado.usuario && (estado.usuario.saldo || 0) >= CUSTO_APOSTA;
     btn.disabled = !(estado.sorteioSelecionado && estado.numerosSelecionados.length === estado.chanceSelecionada && saldoOk);
 }
@@ -745,11 +770,6 @@ async function fazerAposta() {
     }
 
     const config = SORTEOS_CONFIG.find(s => s.id === estado.sorteioSelecionado);
-    if (!config) {
-        mostrarNotificacao('Erro: sorteio nao encontrado!', 'erro');
-        return;
-    }
-    
     const idRecibo = gerarIdRecibo();
     const premioMaximo = TABELA_PREMIOS[estado.chanceSelecionada][estado.chanceSelecionada];
 
@@ -769,17 +789,13 @@ async function fazerAposta() {
     };
 
     try {
-        // Descontar saldo
         const novoSaldo = saldoAtual - CUSTO_APOSTA;
         await db.ref(`mozlotto/usuarios/${estado.usuario.uid}/saldo`).set(novoSaldo);
         await db.ref(`mozlotto/usuarios/${estado.usuario.uid}/totalApostas`).transaction(c => (c || 0) + 1);
 
-        // Atualizar local
         estado.usuario.saldo = novoSaldo;
-        const userSaldo = document.getElementById('userSaldo');
-        if (userSaldo) userSaldo.textContent = novoSaldo.toFixed(2) + ' MTN';
+        document.getElementById('userSaldo').textContent = novoSaldo.toFixed(2) + ' MTN';
 
-        // Salvar aposta
         await db.ref(`mozlotto/apostas/${idRecibo}`).set(aposta);
 
         estado.ultimaAposta = aposta;
@@ -789,17 +805,13 @@ async function fazerAposta() {
 
         mostrarNotificacao(`Aposta registada! Saldo: ${novoSaldo.toFixed(2)} MTN`, 'sucesso');
 
-        // Verificar se saldo ficou baixo
         if (novoSaldo < CUSTO_APOSTA) {
-            const saldoEl = document.getElementById('userSaldo');
-            const saldoAviso = document.getElementById('saldoAviso');
-            if (saldoEl) saldoEl.style.color = '#ff4a4a';
-            if (saldoAviso) saldoAviso.classList.remove('hidden');
+            document.getElementById('userSaldo').style.color = '#ff4a4a';
+            document.getElementById('saldoAviso').classList.remove('hidden');
         }
 
     } catch (err) {
         mostrarNotificacao('Erro ao registrar: ' + err.message, 'erro');
-        console.error('Erro ao fazer aposta:', err);
     }
 }
 
@@ -811,13 +823,11 @@ function gerarIdRecibo() {
 // MODAL DE RECARGA
 // ============================================
 function abrirModalRecarga() {
-    const modal = document.getElementById('modalRecarga');
-    if (modal) modal.classList.add('active');
+    document.getElementById('modalRecarga').classList.add('active');
 }
 
 function fecharModalRecarga() {
-    const modal = document.getElementById('modalRecarga');
-    if (modal) modal.classList.remove('active');
+    document.getElementById('modalRecarga').classList.remove('active');
 }
 
 function copiarNumeroSuporte() {
@@ -884,22 +894,19 @@ function mostrarRecibo(aposta) {
         </div>
     `;
 
-    const reciboContent = document.getElementById('reciboContent');
-    const modalRecibo = document.getElementById('modalRecibo');
-    if (reciboContent) reciboContent.innerHTML = reciboHTML;
-    if (modalRecibo) modalRecibo.classList.add('active');
+    document.getElementById('reciboContent').innerHTML = reciboHTML;
+    document.getElementById('modalRecibo').classList.add('active');
 }
 
 function closeModal() {
-    const modal = document.getElementById('modalRecibo');
-    if (modal) modal.classList.remove('active');
+    document.getElementById('modalRecibo').classList.remove('active');
 }
 
 function printScreen() {
     const recibo = document.getElementById('posReciboPrint');
     if (!recibo) return;
     const w = window.open('', '_blank');
-    w.document.write(`<<html><head><title>Recibo</title><style>
+    w.document.write(`<html><head><title>Recibo</title><style>
         body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0}
         .pos-recibo{width:280px;background:#fff;color:#000;padding:15px;font-family:'Courier New',monospace;font-size:12px;line-height:1.3;border:1px dashed #777}
         .pos-header{text-align:center}.pos-header h3{font-size:16px;margin:0 0 4px;font-weight:bold}
@@ -993,7 +1000,8 @@ async function printBluetooth() {
         await enviarParaImpressora(characteristic);
 
     } catch (err) {
-        alert('Erro: ' + err.message + '\nUse "Imprimir via Navegador".');
+        alert('Erro: ' + err.message + '
+Use "Imprimir via Navegador".');
     }
 }
 
@@ -1091,21 +1099,21 @@ async function enviarParaImpressora(characteristic) {
 // ============================================
 function verificarRecibo() {
     const input = document.getElementById('verificarInput');
-    const idRecibo = input ? input.value.trim().toUpperCase() : '';
+    const idRecibo = input.value.trim().toUpperCase();
     const resultDiv = document.getElementById('verificarResult');
 
     if (!idRecibo) {
-        if (resultDiv) resultDiv.innerHTML = '<p style="color: #ff4a4a;">Insira um ID!</p>';
+        resultDiv.innerHTML = '<p style="color: #ff4a4a;">Insira um ID!</p>';
         return;
     }
 
-    if (resultDiv) resultDiv.innerHTML = '<p style="color: var(--text-muted);">Verificando...</p>';
+    resultDiv.innerHTML = '<p style="color: var(--text-muted);">Verificando...</p>';
 
     db.ref(`mozlotto/apostas/${idRecibo}`).once('value', (snapshot) => {
         const aposta = snapshot.val();
 
         if (!aposta) {
-            if (resultDiv) resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo nao encontrado!</p>';
+            resultDiv.innerHTML = '<p style="color: #ff4a4a;">❌ Recibo nao encontrado!</p>';
             return;
         }
 
@@ -1114,26 +1122,22 @@ function verificarRecibo() {
         db.ref(`mozlotto/sorteios/${aposta.sorteioId}/resultado`).once('value', (resSnapshot) => {
             const resultado = resSnapshot.val();
 
-            // Sorteio ainda nao realizado
             if (!resultado) {
-                if (resultDiv) {
-                    resultDiv.innerHTML = `
-                        <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid #252545;">
-                            <h4 style="color: var(--accent); margin-top: 0;">📋 RECIBO VALIDO</h4>
-                            <p><strong>ID:</strong> ${aposta.id}</p>
-                            <p><strong>Sorteio:</strong> ${aposta.sorteioNome} (${aposta.sorteioHora})</p>
-                            <p><strong>Numeros:</strong> ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ')}</p>
-                            <p><strong>Chance:</strong> ${aposta.chance}</p>
-                            <p><strong>Valor:</strong> ${aposta.valor.toFixed(2)} MTN</p>
-                            <p><strong>Premio Maximo:</strong> ${aposta.premioMaximo.toLocaleString('pt-MZ')} MTN</p>
-                            <p style="color: #f4c430;">⏳ Sorteio nao realizado. Volte apos ${aposta.sorteioHora}.</p>
-                        </div>
-                    `;
-                }
+                resultDiv.innerHTML = `
+                    <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid #252545;">
+                        <h4 style="color: var(--accent); margin-top: 0;">📋 RECIBO VALIDO</h4>
+                        <p><strong>ID:</strong> ${aposta.id}</p>
+                        <p><strong>Sorteio:</strong> ${aposta.sorteioNome} (${aposta.sorteioHora})</p>
+                        <p><strong>Numeros:</strong> ${aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ')}</p>
+                        <p><strong>Chance:</strong> ${aposta.chance}</p>
+                        <p><strong>Valor:</strong> ${aposta.valor.toFixed(2)} MTN</p>
+                        <p><strong>Premio Maximo:</strong> ${aposta.premioMaximo.toLocaleString('pt-MZ')} MTN</p>
+                        <p style="color: #f4c430;">⏳ Sorteio nao realizado. Volte apos ${aposta.sorteioHora}.</p>
+                    </div>
+                `;
                 return;
             }
 
-            // Calcular acertos e premio
             const acertos = aposta.numeros.filter(n => resultado.includes(n));
             const numAcertos = acertos.length;
             const premio = TABELA_PREMIOS[aposta.chance]?.[numAcertos] || 0;
@@ -1213,7 +1217,7 @@ function verificarRecibo() {
             }
 
             html += `</div>`;
-            if (resultDiv) resultDiv.innerHTML = html;
+            resultDiv.innerHTML = html;
         });
     });
 }
@@ -1222,7 +1226,14 @@ function verificarRecibo() {
 // PAGAR RECIBO - MARCA COMO PAGO NO FIREBASE
 // ============================================
 function pagarRecibo(idRecibo, valor) {
-    if (!confirm(`CONFIRMAR PAGAMENTO\n\nRecibo: ${idRecibo}\nValor: ${valor.toLocaleString('pt-MZ')} MTN\n\nApos pagar, este recibo ficara invalido para novos pagamentos.\n\nDeseja continuar?`)) {
+    if (!confirm(`CONFIRMAR PAGAMENTO
+
+Recibo: ${idRecibo}
+Valor: ${valor.toLocaleString('pt-MZ')} MTN
+
+Apos pagar, este recibo ficara invalido para novos pagamentos.
+
+Deseja continuar?`)) {
         return;
     }
 
@@ -1240,7 +1251,10 @@ function pagarRecibo(idRecibo, valor) {
             }
         });
 
-        alert(`✅ PAGAMENTO CONFIRMADO!\n\n${valor.toLocaleString('pt-MZ')} MTN pagos.\nRecibo ${idRecibo} marcado como UTILIZADO.`);
+        alert(`✅ PAGAMENTO CONFIRMADO!
+
+${valor.toLocaleString('pt-MZ')} MTN pagos.
+Recibo ${idRecibo} marcado como UTILIZADO.`);
         verificarRecibo();
 
     }).catch(err => {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MozLottoGanha - Lotaria Gratuita</title>
+    <title>MozLottoGanha - Terminal do Operador</title>
     <style>
         :root {
             --bg-dark: #0a0a1a;
@@ -134,6 +134,15 @@
         }
         .aposta-info h3 { font-size: 1.1rem; }
         .aposta-info p { color: var(--text-muted); font-size: 0.9rem; }
+        .custo-display {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        .custo-display .label { color: var(--text-muted); font-size: 0.8rem; }
+        .custo-display .valor { color: var(--accent); font-size: 1.5rem; font-weight: bold; }
         .chance-selector {
             display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
         }
@@ -314,7 +323,7 @@
     <div class="container">
         <div class="header">
             <h1>MOZLOTTOGANHA</h1>
-            <p>Lotaria Gratuita - Jogue Sem Limites</p>
+            <p>Terminal do Operador - Receba Dinheiro e Imprima Recibos</p>
         </div>
         <div class="stats-bar">
             <div class="stat-item">
@@ -322,8 +331,12 @@
                 <div class="stat-valor" id="statTotalApostas">0</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">Total Premios</div>
+                <div class="stat-label">Total Premios Pagos</div>
                 <div class="stat-valor" id="statTotalPremios">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Caixa (Arrecadado)</div>
+                <div class="stat-valor" id="statCaixa">0</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">Sorteios Hoje</div>
@@ -340,8 +353,9 @@
                     <h3>🎲 Fazer Aposta</h3>
                     <p>Sorteio: <strong id="sorteioNome">Nenhum</strong> | Hora: <strong id="sorteioHora">--:--</strong></p>
                 </div>
-                <div style="text-align: right;">
-                    <p style="color: var(--accent); font-weight: bold;">🎉 TOTALMENTE GRATUITO</p>
+                <div class="custo-display">
+                    <div class="label">CUSTO DA APOSTA</div>
+                    <div class="valor">5.00 MTN</div>
                 </div>
             </div>
             <div class="chance-selector">
@@ -357,11 +371,11 @@
                 <button class="btn-limpar" onclick="clearSelection()">🗑️ Limpar</button>
             </div>
             <button class="btn-apostar" id="btnApostar" onclick="fazerAposta()" disabled>
-                🎯 CONFIRMAR APOSTA
+                🎯 CONFIRMAR APOSTA - COBRAR 5.00 MTN
             </button>
         </div>
         <div class="verificador-section">
-            <h2 class="section-title">Verificar Recibo</h2>
+            <h2 class="section-title">Verificar Recibo / Pagar Premio</h2>
             <div class="verificador-input-group">
                 <input type="text" class="verificador-input" id="verificarInput" placeholder="Insira o ID do recibo...">
                 <button class="btn-verificar" onclick="verificarRecibo()">🔍 Verificar</button>
@@ -387,8 +401,9 @@
     <script>
 
 // ============================================
-// MOZLOTTOGANHA - GRATUITO (v10)
-// SEM SALDO, SEM CUSTO, SEM LOGIN, SEM FIREBASE
+// MOZLOTTOGANHA - OPERADOR/CASH (v11)
+// SEM LOGIN, SEM SALDO DO USUARIO
+// OPERADOR RECEBE DINHEIRO E IMPRIME RECIBO
 // ============================================
 
 const SORTEOS_CONFIG = [
@@ -409,6 +424,8 @@ const TABELA_PREMIOS = {
     2: { 2: 250, 1: 25 }
 };
 
+const CUSTO_APOSTA = 5; // Custo real em MTN
+
 let estado = {
     sorteioSelecionado: null,
     chanceSelecionada: 5,
@@ -419,7 +436,8 @@ let estado = {
     btDevice: null,
     btCharacteristic: null,
     totalApostas: 0,
-    totalPremios: 0
+    totalPremios: 0,
+    caixaTotal: 0 // Total arrecadado pelo operador
 };
 
 const DB = {
@@ -436,28 +454,39 @@ const DB = {
 function carregarDados() {
     const sorteiosSalvos = DB.get('sorteios');
     if (sorteiosSalvos) estado.sorteios = sorteiosSalvos;
+
     const stats = DB.get('stats');
     if (stats) {
         estado.totalApostas = stats.totalApostas || 0;
         estado.totalPremios = stats.totalPremios || 0;
+        estado.caixaTotal = stats.caixaTotal || 0;
     }
+
     const apostasSalvas = DB.get('apostas');
     if (!apostasSalvas) DB.set('apostas', {});
 }
 
 function salvarSorteios() { DB.set('sorteios', estado.sorteios); }
+
 function salvarStats() {
-    DB.set('stats', { totalApostas: estado.totalApostas, totalPremios: estado.totalPremios });
+    DB.set('stats', { 
+        totalApostas: estado.totalApostas, 
+        totalPremios: estado.totalPremios,
+        caixaTotal: estado.caixaTotal
+    });
 }
+
 function salvarAposta(aposta) {
     const apostas = DB.get('apostas') || {};
     apostas[aposta.id] = aposta;
     DB.set('apostas', apostas);
 }
+
 function getAposta(id) {
     const apostas = DB.get('apostas') || {};
     return apostas[id] || null;
 }
+
 function atualizarAposta(id, dados) {
     const apostas = DB.get('apostas') || {};
     if (apostas[id]) {
@@ -469,6 +498,8 @@ function atualizarAposta(id, dados) {
 function atualizarStats() {
     document.getElementById('statTotalApostas').textContent = estado.totalApostas;
     document.getElementById('statTotalPremios').textContent = estado.totalPremios.toLocaleString('pt-MZ') + ' MTN';
+    document.getElementById('statCaixa').textContent = estado.caixaTotal.toLocaleString('pt-MZ') + ' MTN';
+
     let sorteiosHoje = 0;
     const hoje = new Date();
     for (let id in estado.sorteios) {
@@ -710,7 +741,7 @@ async function realizarSorteioInteligente(sorteioId) {
         if (sorteioData && sorteioData.resultado && sorteioEhDeHoje(sorteioData)) return;
         const apostas = DB.get('apostas') || {};
         const listaApostas = Object.values(apostas).filter(a => a.sorteioId === sorteioId);
-        const totalArrecadado = listaApostas.length * 5;
+        const totalArrecadado = listaApostas.length * CUSTO_APOSTA;
         const maxPremios = Math.floor(totalArrecadado * 0.40);
         let melhorResultado = null;
         let melhorCusto = Infinity;
@@ -828,9 +859,16 @@ async function fazerAposta() {
         mostrarNotificacao('Selecione ' + estado.chanceSelecionada + ' numeros!', 'erro');
         return;
     }
+
+    // CONFIRMAÇÃO: O operador recebeu o dinheiro?
+    if (!confirm('CONFIRME O PAGAMENTO\n\nValor: ' + CUSTO_APOSTA + '.00 MTN\n\nO jogador ja pagou em dinheiro?\n\nClique OK para confirmar e imprimir o recibo.')) {
+        return;
+    }
+
     const config = SORTEOS_CONFIG.find(s => s.id === estado.sorteioSelecionado);
     const idRecibo = gerarIdRecibo();
     const premioMaximo = TABELA_PREMIOS[estado.chanceSelecionada][estado.chanceSelecionada];
+
     const aposta = {
         id: idRecibo,
         sorteioId: estado.sorteioSelecionado,
@@ -838,14 +876,16 @@ async function fazerAposta() {
         sorteioHora: config.hora,
         numeros: [...estado.numerosSelecionados],
         chance: estado.chanceSelecionada,
-        valor: 0,
+        valor: CUSTO_APOSTA,
         premioMaximo: premioMaximo,
         dataAposta: new Date().toISOString(),
         pago: false,
         dataPagamento: null
     };
+
     try {
         estado.totalApostas++;
+        estado.caixaTotal += CUSTO_APOSTA;
         salvarStats();
         salvarAposta(aposta);
         estado.ultimaAposta = aposta;
@@ -853,7 +893,7 @@ async function fazerAposta() {
         clearSelection();
         atualizarBotaoApostar();
         atualizarStats();
-        mostrarNotificacao('Aposta registada! ID: ' + idRecibo, 'sucesso');
+        mostrarNotificacao('Aposta registada! ID: ' + idRecibo + ' | +' + CUSTO_APOSTA + ' MTN no caixa', 'sucesso');
     } catch (err) {
         mostrarNotificacao('Erro ao registrar: ' + err.message, 'erro');
     }
@@ -871,7 +911,7 @@ function mostrarRecibo(aposta) {
         <div class="pos-recibo" id="posReciboPrint">
             <div class="pos-header">
                 <h3>MOZLOTTOGANHA</h3>
-                <div class="sub">Lotaria Gratuita</div>
+                <div class="sub">Sistema de Lotaria</div>
                 <div class="sub">Mocambique</div>
             </div>
             <div class="pos-divider">========================</div>
@@ -888,6 +928,10 @@ function mostrarRecibo(aposta) {
             </div>
             <div class="pos-line"><span>Chance:</span><span>${aposta.chance}</span></div>
             <div class="pos-divider">------------------------</div>
+            <div class="pos-valor-box">
+                <div class="label">VALOR PAGO</div>
+                <div class="valor">${aposta.valor.toFixed(2)} MTN</div>
+            </div>
             <div class="pos-valor-box" style="border-color: #00aa00;">
                 <div class="label">PREMIO MAXIMO</div>
                 <div class="valor" style="color: #00aa00;">${aposta.premioMaximo.toLocaleString('pt-MZ')} MTN</div>
@@ -1027,7 +1071,7 @@ async function enviarParaImpressora(characteristic) {
     addBytes(CENTER); addBytes(BOLD_ON); addBytes(DOUBLE_ON);
     addText('MOZLOTTOGANHA');
     addBytes(DOUBLE_OFF); addBytes(BOLD_OFF); addBytes(LINE);
-    addText('Lotaria Gratuita'); addBytes(LINE);
+    addText('Sistema de Lotaria'); addBytes(LINE);
     addText('Mocambique'); addBytes(LINE);
     addText('========================'); addBytes(LINE);
     addBytes(BOLD_ON); addText('RECIBO DE APOSTA'); addBytes(BOLD_OFF); addBytes(LINE);
@@ -1045,6 +1089,8 @@ async function enviarParaImpressora(characteristic) {
     addBytes(DOUBLE_OFF); addBytes(LINE);
     addText('Chance ' + aposta.chance); addBytes(LINE);
     addText('------------------------'); addBytes(LINE);
+    addText('VALOR PAGO'); addBytes(LINE);
+    addBytes(HEIGHT_ON); addText(aposta.valor.toFixed(2) + ' MTN'); addBytes(HEIGHT_OFF); addBytes(LINE); addBytes(LINE);
     addText('PREMIO MAXIMO'); addBytes(LINE);
     addBytes(HEIGHT_ON); addText(aposta.premioMaximo.toLocaleString('pt-MZ') + ' MTN'); addBytes(HEIGHT_OFF); addBytes(LINE);
     addText('------------------------'); addBytes(LINE);
@@ -1105,6 +1151,7 @@ function verificarRecibo() {
             '<p><strong>Sorteio:</strong> ' + aposta.sorteioNome + ' (' + aposta.sorteioHora + ')</p>' +
             '<p><strong>Numeros:</strong> ' + aposta.numeros.map(n => String(n).padStart(2,'0')).join(', ') + '</p>' +
             '<p><strong>Chance:</strong> ' + aposta.chance + '</p>' +
+            '<p><strong>Valor Pago:</strong> ' + aposta.valor.toFixed(2) + ' MTN</p>' +
             '<p><strong>Premio Maximo:</strong> ' + aposta.premioMaximo.toLocaleString('pt-MZ') + ' MTN</p>' +
             '<p style="color: #f4c430;">⏳ Sorteio nao realizado. Volte apos ' + aposta.sorteioHora + '.</p>' +
             '</div>';
@@ -1122,6 +1169,7 @@ function verificarRecibo() {
         '<hr style="border-color: #252545; margin: 10px 0;">' +
         '<p><strong>ID:</strong> ' + aposta.id + '</p>' +
         '<p><strong>Sorteio:</strong> ' + aposta.sorteioNome + '</p>' +
+        '<p><strong>Valor Pago:</strong> ' + aposta.valor.toFixed(2) + ' MTN</p>' +
         '<div style="margin: 12px 0;">' +
         '<p style="margin: 5px 0; color: var(--text-muted);"><strong>Numeros Sorteados:</strong></p>' +
         '<div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">' +

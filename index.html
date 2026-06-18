@@ -3,207 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mozlottoganha - Sistema Multi-Apostas</title>
+    <title>Mozlottoganha - Sistema Avançado</title>
     <style>
-        :root {
-            --primary: #008751;
-            --secondary: #f7a600;
-            --dark: #1a1a1a;
-            --light: #f4f4f4;
-            --danger: #cc3300;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--light);
-            margin: 0;
-            padding: 20px;
-            color: var(--dark);
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        h1, h2, h3 { text-align: center; color: var(--primary); margin-top: 5px; }
+        :root { --primary: #008751; --secondary: #f7a600; --dark: #1a1a1a; --light: #f4f4f4; }
+        body { font-family: sans-serif; background: var(--light); padding: 20px; color: var(--dark); }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
-        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-        
-        .card {
-            border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 8px;
-            background: #fff;
-        }
-        select, input, button {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            box-sizing: border-box;
-        }
-        button {
-            background: var(--primary);
-            color: white;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        button:hover { background: #005e38; }
-        .btn-bluetooth { background: #0066cc; }
-        .btn-bluetooth:hover { background: #004499; }
-        .btn-add { background: var(--secondary); color: black; }
-        .btn-add:hover { background: #d68f00; }
-        
-        /* Estilo das Bolas */
-        .balls-grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 5px;
-            margin-top: 10px;
-        }
-        .ball {
-            background: #eee;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-        }
-        .ball.selected {
-            background: var(--secondary);
-            color: black;
-            border-color: var(--dark);
-        }
-
-        /* Tabela de Apostas Atuais no Bilhete */
-        .ticket-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 13px;
-        }
-        .ticket-table th, .ticket-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        .ticket-table th { background: #f2f2f2; }
-        .remove-btn { color: var(--danger); cursor: pointer; font-weight: bold; text-align: center;}
-
-        /* Estilo Recibo POS */
-        #pos-receipt {
-            font-family: 'Courier New', Courier, monospace;
-            width: 280px;
-            background: white;
-            padding: 10px;
-            border: 1px dashed #000;
-            margin: 20px auto;
-            font-size: 12px;
-            line-height: 1.2;
-            display: none;
-        }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
+        .card { border: 1px solid #ddd; padding: 15px; border-radius: 6px; background: #fff; margin-bottom: 15px;}
+        .balls-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+        .ball { background: #eee; padding: 8px 0; text-align: center; font-size: 11px; font-weight: bold; cursor: pointer; border-radius: 50%; }
+        .ball.selected { background: var(--secondary); color: black; }
+        button { width: 100%; padding: 12px; margin: 8px 0; background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        .btn-blue { background: #0066cc; }
+        .btn-orange { background: var(--secondary); color: black; }
+        .status-box { background: #eef; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🇲🇿 Mozlottoganha</h1>
-    <p style="text-align:center; font-weight:bold; margin-bottom: 20px;">Sistema de Bilhetes com Múltiplas Apostas</p>
+    <h1>🇲🇿 Mozlottoganha Pro</h1>
     
     <div class="grid">
-        <!-- ÁREA DE CRIAÇÃO DA APOSTA -->
-        <div class="card">
-            <h2>Configurar Aposta</h2>
-            
-            <label>1. Selecione o Sorteio:</label>
-            <select id="draw-select" onchange="validateDrawTime()"></select>
-            <small id="time-warning" style="color:red; font-weight:bold; dsiplay:block;"></small>
-            
-            <label style="margin-top:10px; display:block;">2. Modalidade (Chance):</label>
-            <select id="chance-select" onchange="resetBallSelection()">
-                <option value="5">Chance 5 (Escolha 5 números)</option>
-                <option value="4">Chance 4 (Escolha 4 números)</option>
-                <option value="3">Chance 3 (Escolha 3 números)</option>
-                <option value="2">Chance 2 (Escolha 2 números)</option>
-            </select>
-
-            <label>3. Valor desta Aposta (MTN):</label>
-            <input type="number" id="bet-amount" value="20" min="5">
-
-            <label>4. Selecione os Números (<span id="selected-count">0</span>):</label>
-            <div class="balls-grid" id="balls-container"></div>
-            
-            <button class="btn-add" id="btn-add-list" style="margin-top:15px;" onclick="addApostaToLista()">+ ADICIONAR AO BILHETE</button>
-        </div>
-
-        <!-- BILHETE ATUAL E INFRAESTRUTURA -->
-        <div class="card">
-            <h2>Bilhete Atual</h2>
-            
-            <div style="max-height: 200px; overflow-y: auto;">
-                <table class="ticket-table">
-                    <thead>
-                        <tr>
-                            <th>Sorteio</th>
-                            <th>Tipo</th>
-                            <th>Números</th>
-                            <th>Valor</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="ticket-body">
-                        <!-- Linhas inseridas via JS -->
-                    </tbody>
-                </table>
-            </div>
-            
-            <h3 style="text-align: right; margin-top: 10px;">Total Bilhete: <span id="ticket-total">0</span> MTN</h3>
-            <button id="btn-submit-ticket" onclick="finalizarEImprimirBilhete()" style="background: #008751;" disabled>CONCLUIR BILHETE & IMPRIMIR</button>
-            
-            <hr style="margin: 20px 0;">
-            
-            <button class="btn-bluetooth" onclick="connectBluetooth()">🔌 Conectar Impressora Bluetooth</button>
-            <p id="bt-status" style="text-align:center; color: gray; font-size: 13px;">Impressora Não Conectada</p>
-            
-            <hr>
-            <h3>Validar Código de Recibo</h3>
-            <input type="text" id="search-receipt" placeholder="Insira o número do recibo">
-            <button onclick="verifyReceipt()">Verificar Estado das Apostas</button>
-            <div id="verify-result" style="margin-top:10px; font-size:13px; font-weight:bold; text-align:center;"></div>
-        </div>
-    </div>
-
-    <!-- MODELO DE IMPRESSÃO VISUAL P.O.S (Oculto, serve de espelho) -->
-    <div id="pos-receipt">
-        <div class="text-center">
-            <strong>MOZLOTTOGANHA</strong><br>
-            Maputo, Moçambique<br>
-            --------------------------------
-        </div>
         <div>
-            <strong>BILHETE:</strong> <span id="r-id"></span><br>
-            <strong>DATA HORA:</strong> <span id="r-date"></span><br>
-            --------------------------------<br>
-            <div class="text-center"><strong>APOSTAS REGISTADAS</strong></div>
-            <div id="r-items-list" style="font-size: 11px;"></div>
-            --------------------------------<br>
-            <strong style="font-size: 14px;">TOTAL: <span id="r-total"></span> MTN</strong><br>
-            --------------------------------
+            <div class="card">
+                <h3>1. Nova Aposta</h3>
+                <label>Sorteio:</label>
+                <select id="draw-select"></select>
+                
+                <label>Modalidade:</label>
+                <select id="chance-select" onchange="resetSelection()">
+                    <option value="5">Chance 5</option>
+                    <option value="4">Chance 4</option>
+                    <option value="3">Chance 3</option>
+                    <option value="2">Chance 2</option>
+                </select>
+                
+                <label>Valor (MTN):</label>
+                <input type="number" id="bet-amount" value="50" style="width:100%; padding:8px; margin:5px 0;">
+
+                <div class="balls-grid" id="balls-container"></div>
+                <button class="btn-orange" onclick="addAposta()">+ Adicionar ao Bilhete</button>
+            </div>
+
+            <div class="card">
+                <h3>2. Linhas no Bilhete</h3>
+                <div id="lista-carrinho" style="font-size:12px;">Nenhuma aposta adicionada.</div>
+                <h4>Total: <span id="total-bilhete">0</span> MTN</h4>
+                <button onclick="finalizarEImprimir()">EMITIR BILHETE (IMPRIMIR)</button>
+            </div>
         </div>
-        <div class="text-center">
-            <small>Valide o código antes de pagar.<br>Boa Sorte!</small>
+
+        <div>
+            <div class="card">
+                <h3>Hardware / Impressora</h3>
+                <button class="btn-blue" onclick="conectarImpressora()">🔌 Conectar Bluetooth POS</button>
+                <div class="status-box" id="bt-status">Status: Desconectado</div>
+            </div>
+
+            <div class="card">
+                <h3>⚙️ Simulação: Executar Sorteio (Controle 40%)</h3>
+                <label>Escolha o Sorteio para Rodar:</label>
+                <select id="draw-sorteio-select"></select>
+                <button style="background:#cc3300;" onclick="executarSorteioInteligente()">🎰 Rodar Sorteio Seguro</button>
+                <div class="status-box" id="resultado-sorteio" style="font-weight:bold; background:#fff3cd;">
+                    Nenhum sorteio executado ainda.
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -220,276 +86,221 @@
         { id: 8, nome: "Da Despedida", hora: "22:00" }
     ];
 
-    let selectedNumbers = [];
-    let carrinhoApostas = []; // Armazena as múltiplas apostas do bilhete atual
-    let bluetoothCharacteristic = null;
-    
-    // DB Simulado
-    let ApostasDB = JSON.parse(localStorage.getItem('mozlotto_multibets')) || {};
+    let selecionados = [];
+    let carrinho = [];
+    let dispositivoBt = null;
+    let caracteristicaEscrita = null; // O canal que realmente envia texto à impressora
 
     window.onload = function() {
-        populateDraws();
-        renderBalls();
-        validateDrawTime();
+        const sel1 = document.getElementById('draw-select');
+        const sel2 = document.getElementById('draw-sorteio-select');
+        Sorteios.forEach(s => {
+            let op = `<option value="${s.id}">${s.nome} (${s.hora})</option>`;
+            sel1.innerHTML += op;
+            sel2.innerHTML += op;
+        });
+        
+        const container = document.getElementById('balls-container');
+        for(let i=1; i<=90; i++) {
+            container.innerHTML += `<div class="ball" id="b-${i}" onclick="votar(${i})">${i}</div>`;
+        }
     };
 
-    function populateDraws() {
-        const select = document.getElementById('draw-select');
-        Sorteios.forEach(s => {
-            let option = document.createElement('option');
-            option.value = s.id;
-            option.innerText = `${s.id} - ${s.nome} (${s.hora}h)`;
-            select.appendChild(option);
-        });
-    }
-
-    function renderBalls() {
-        const container = document.getElementById('balls-container');
-        container.innerHTML = '';
-        for (let i = 1; i <= 90; i++) {
-            let ball = document.createElement('div');
-            ball.className = 'ball';
-            ball.innerText = i;
-            ball.onclick = () => selectNumber(i, ball);
-            container.appendChild(ball);
+    function votar(n) {
+        let max = parseInt(document.getElementById('chance-select').value);
+        let el = document.getElementById(`b-${n}`);
+        if(selecionados.includes(n)) {
+            selecionados = selecionados.filter(x => x !== n);
+            el.classList.remove('selected');
+        } else if(selecionados.length < max) {
+            selecionados.push(n);
+            el.classList.add('selected');
         }
     }
 
-    function selectNumber(num, element) {
-        const maxAllowed = parseInt(document.getElementById('chance-select').value);
-        
-        if (selectedNumbers.includes(num)) {
-            selectedNumbers = selectedNumbers.filter(n => n !== num);
-            element.classList.remove('selected');
-        } else {
-            if (selectedNumbers.length < maxAllowed) {
-                selectedNumbers.push(num);
-                element.classList.add('selected');
-            } else {
-                alert(`Para esta modalidade escolha exatamente ${maxAllowed} números.`);
-            }
-        }
-        document.getElementById('selected-count').innerText = selectedNumbers.length;
-    }
-
-    function resetBallSelection() {
-        selectedNumbers = [];
-        document.getElementById('selected-count').innerText = 0;
+    function resetSelection() {
+        selecionados = [];
         document.querySelectorAll('.ball').forEach(b => b.classList.remove('selected'));
     }
 
-    function validateDrawTime() {
-        const drawId = document.getElementById('draw-select').value;
-        const sorteio = Sorteios.find(s => s.id == drawId);
-        const warning = document.getElementById('time-warning');
-        const btnAdd = document.getElementById('btn-add-list');
+    function addAposta() {
+        let drawId = document.getElementById('draw-select').value;
+        let sorteio = Sorteios.find(x => x.id == drawId);
+        let chance = document.getElementById('chance-select').value;
+        let valor = parseFloat(document.getElementById('bet-amount').value);
 
-        const agora = new Date();
-        const [horaSorteio, minSorteio] = sorteio.hora.split(':');
-        const dataSorteio = new Date();
-        dataSorteio.setHours(horaSorteio, minSorteio, 0, 0);
+        if(selecionados.length != chance) { return alert("Selecione a quantidade certa de bolas."); }
 
-        const diferencaMinutos = (dataSorteio - agora) / 1000 / 60;
-
-        // Bloqueia adição se faltar menos de 15 minutos para o sorteio em questão
-        if (diferencaMinutos > 0 && diferencaMinutos < 15) {
-            warning.innerText = `⚠️ Sorteio das ${sorteio.hora}h fechado (limite de 15 min excedido).`;
-            btnAdd.disabled = true;
-            btnAdd.style.background = '#ccc';
-        } else {
-            warning.innerText = "";
-            btnAdd.disabled = false;
-            btnAdd.style.background = 'var(--secondary)';
-        }
-    }
-
-    // Adiciona uma linha de aposta ao bilhete temporário
-    function addApostaToLista() {
-        const drawId = document.getElementById('draw-select').value;
-        const chance = parseInt(document.getElementById('chance-select').value);
-        const amount = parseFloat(document.getElementById('bet-amount').value);
-        const sorteio = Sorteios.find(s => s.id == drawId);
-
-        if (selectedNumbers.length !== chance) {
-            alert(`Por favor, selecione exatamente ${chance} números para a Chance ${chance}.`);
-            return;
-        }
-
-        const subAposta = {
-            sorteioId: sorteio.id,
-            sorteioNome: sorteio.nome,
-            horaSorteio: sorteio.hora,
-            chance: chance,
-            numeros: [...selectedNumbers].sort((a,b)=>a-b),
-            valor: amount,
-            status: 'Pendente'
-        };
-
-        carrinhoApostas.push(subAposta);
-        atualizarTabelaCarrinho();
-        resetBallSelection();
-    }
-
-    function removerAposta(index) {
-        carrinhoApostas.splice(index, 1);
-        atualizarTabelaCarrinho();
-    }
-
-    function atualizarTabelaCarrinho() {
-        const tbody = document.getElementById('ticket-body');
-        const totalSpan = document.getElementById('ticket-total');
-        const btnSubmit = document.getElementById('btn-submit-ticket');
+        carrinho.push({ sorteioId: sorteio.id, nome: sorteio.nome, chance: chance, numeros: [...selecionados], valor: valor });
         
-        tbody.innerHTML = '';
-        let total = 0;
-
-        carrinhoApostas.forEach((ap, index) => {
-            total += ap.valor;
-            let row = `<tr>
-                <td>${ap.sorteioNome} (${ap.horaSorteio}h)</td>
-                <td>C${ap.chance}</td>
-                <td><b>${ap.numeros.join(', ')}</b></td>
-                <td>${ap.valor} MT</td>
-                <td class="remove-btn" onclick="removerAposta(${index})">❌</td>
-            </tr>`;
-            tbody.innerHTML += row;
-        });
-
-        totalSpan.innerText = total;
-        btnSubmit.disabled = carrinhoApostas.length === 0;
+        let lista = document.getElementById('lista-carrinho');
+        lista.innerHTML = carrinho.map((c, i) => `<div>[Sorteio: ${c.nome}] Chance ${c.chance}: <b>${c.numeros.join(', ')}</b> - ${c.valor}MTN</div>`).join('');
+        document.getElementById('total-bilhete').innerText = carrinho.reduce((a,b) => a + b.valor, 0);
+        resetSelection();
     }
 
-    // Fecha o bilhete completo, gera o Recibo Único e grava no sistema
-    function finalizarEImprimirBilhete() {
-        if (carrinhoApostas.length === 0) return;
-
-        const receiptId = "MZ-" + Math.random().toString(36).substr(2, 6).toUpperCase();
-        const now = new Date();
-        const totalBilhete = carrinhoApostas.reduce((sum, item) => sum + item.valor, 0);
-
-        const novoBilheteCompleto = {
-            id: receiptId,
-            dataHora: now.toLocaleString(),
-            apostas: [...carrinhoApostas],
-            total: totalBilhete
-        };
-
-        // Salva no Histórico do Sistema
-        ApostasDB[receiptId] = novoBilheteCompleto;
-        localStorage.setItem('mozlotto_multibets', JSON.stringify(ApostasDB));
-
-        // Renderiza espelho do recibo POS na tela
-        document.getElementById('r-id').innerText = receiptId;
-        document.getElementById('r-date').innerText = novoBilheteCompleto.dataHora;
-        document.getElementById('r-total').innerText = totalBilhete;
-
-        const listDiv = document.getElementById('r-items-list');
-        listDiv.innerHTML = '';
-        novoBilheteCompleto.apostas.forEach(ap => {
-            listDiv.innerHTML += `
-                <div>
-                    <b>Sorteio:</b> ${ap.sorteioNome} (${ap.horaSorteio}h)<br>
-                    <b>Chance ${ap.chance}:</b> [${ap.numeros.join(', ')}] -> ${ap.valor} MTN
-                </div><br>
-            `;
-        });
-
-        document.getElementById('pos-receipt').style.display = 'block';
-
-        // Dispara Impressora Física Bluetooth se houver conexão ativa
-        printBluetoothReceipt(novoBilheteCompleto);
-
-        alert(`Bilhete Emitido com Sucesso!\nCódigo Único: ${receiptId}\nTotal de Apostas: ${carrinhoApostas.length}`);
-        
-        // Limpa tudo para o próximo cliente
-        carrinhoApostas = [];
-        atualizarTabelaCarrinho();
-    }
-
-    // Validador contra fraude de recibos modificados manualmente
-    function verifyReceipt() {
-        const id = document.getElementById('search-receipt').value.trim().toUpperCase();
-        const resultDiv = document.getElementById('verify-result');
-
-        if (!ApostasDB[id]) {
-            resultDiv.innerHTML = "<span style='color:red;'>❌ ALERTA: BILHETE INVÁLIDO OU NÃO EMITIDO PELA MÁQUINA!</span>";
-            return;
-        }
-
-        const bilhete = ApostasDB[id];
-        let resumoStatus = `<div style='text-align:left; background:#f9f9f9; padding: 10px; border-radius:5px;'>
-            <b>Bilhete Oficial Encontrado!</b><br>
-            Emitido em: ${bilhete.dataHora}<br>
-            Total: ${bilhete.total} MTN<br><hr>`;
-
-        bilhete.apostas.forEach((ap, idx) => {
-            resumoStatus += `Aposta ${idx+1}: Sorteio ${ap.sorteioNome} (${ap.horaSorteio}h) - C${ap.chance} [${ap.numeros.join(', ')}] -> <b>Status: ${ap.status}</b><br>`;
-        });
-        resumoStatus += `</div>`;
-
-        resultDiv.innerHTML = resumoStatus;
-    }
-
-    // CONEXÃO COM IMPRESSORA BLUETOOTH TÉRMICA (ESC/POS)
-    async function connectBluetooth() {
-        const statusText = document.getElementById('bt-status');
+    // ==========================================
+    // CORREÇÃO DO BLUETOOTH: ACESSANDO O CANAL DE ESCRITA (CHARACTERISTIC)
+    // ==========================================
+    async function conectarImpressora() {
+        const statusBox = document.getElementById('bt-status');
         try {
-            statusText.innerText = "Buscando dispositivo...";
-            let device = await navigator.bluetooth.requestDevice({
+            statusBox.innerText = "A procurar dispositivos...";
+            dispositivoBt = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+                optionalServices: ['0000ff00-0000-1000-8000-00805f9b34fb', '000018f0-0000-1000-8000-00805f9b34fb'] 
             });
 
-            const server = await device.gatt.connect();
-            const services = await server.getPrimaryServices();
-            const service = services[0]; 
-            const characteristics = await service.getCharacteristics();
-            bluetoothCharacteristic = characteristics[0];
+            statusBox.innerText = "A conectar ao servidor da impressora...";
+            const gattServer = await dispositivoBt.gatt.connect();
+            
+            statusBox.innerText = "A mapear canais de texto (Services)...";
+            const services = await gattServer.getPrimaryServices();
+            
+            // Procura a característica que aceita escrita de dados de texto (WRITE)
+            for (let service of services) {
+                let characteristics = await service.getCharacteristics();
+                for (let char of characteristics) {
+                    if (char.properties.write || char.properties.writeWithoutResponse) {
+                        caracteristicaEscrita = char; // Encontrou o canal correto de impressão!
+                        break;
+                    }
+                }
+                if (caracteristicaEscrita) break;
+            }
 
-            statusText.innerHTML = `🟢 Conectado a: <b>${device.name}</b>`;
-        } catch (error) {
-            console.error(error);
-            statusText.innerText = "❌ Erro ao emparelhar com a impressora.";
+            if(caracteristicaEscrita) {
+                statusBox.innerHTML = `🟢 Conectado com Sucesso a: <b>${dispositivoBt.name}</b>`;
+            } else {
+                statusBox.innerText = "⚠️ Conectou, mas não encontrou o canal de escrita ESC/POS.";
+            }
+        } catch (e) {
+            console.error(e);
+            statusBox.innerText = "❌ Falha na conexão. Ative o Bluetooth.";
         }
     }
 
-    function printBluetoothReceipt(bilhete) {
-        if (!bluetoothCharacteristic) {
-            console.log("Sem impressora Bluetooth configurada. Impressão física pulada.");
-            return;
+    function finalizarEImprimir() {
+        if(carrinho.length === 0) return alert("Adicione apostas primeiro.");
+        const reciboId = "MZ-" + Math.random().toString(36).substr(2, 6).toUpperCase();
+        const total = carrinho.reduce((a,b) => a + b.valor, 0);
+
+        // Salvar em banco local para auditoria antifraude
+        let todosBilhetes = JSON.parse(localStorage.getItem('sistema_lotto_db')) || [];
+        todosBilhetes.push({ id: reciboId, apostas: carrinho, total: total, pago: false });
+        localStorage.setItem('sistema_lotto_db', JSON.stringify(todosBilhetes));
+
+        // Construir Texto do modelo P.O.S Termico
+        let txt = `     MOZLOTTOGANHA\n--------------------------------\nBILHETE: ${reciboId}\n--------------------------------\n`;
+        carrinho.forEach((c, idx) => {
+            txt += `${idx+1}. Sorteio: ${c.nome}\n   Chance ${c.chance}: ${c.numeros.join('-')}\n   Valor: ${c.valor} MTN\n`;
+        });
+        txt += `--------------------------------\nTOTAL: ${total} MTN\n\n   Boa Sorte Moçambique\n\n\n\n`;
+
+        // Transmitir Texto Puro para os rolos da Impressora via Bluetooth
+        if (caracteristicaEscrita) {
+            let encoder = new TextEncoder();
+            caracteristicaEscrita.writeValue(encoder.encode(txt))
+                .then(() => alert("Imprimindo bilhete na máquina física..."))
+                .catch(err => alert("Erro ao empurrar bytes para o rolo: " + err));
+        } else {
+            alert(`Bilhete gerado com ID ${reciboId}, mas nenhuma impressora física está ativa.`);
         }
 
-        // Formatação nativa de texto limpo para bobina térmica de 58mm/80mm
-        let textoEscPos = 
-            "       MOZLOTTOGANHA\n" +
-            "     Maputo, Mocambique\n" +
-            "--------------------------------\n" +
-            `BILHETE: ${bilhete.id}\n` +
-            `EMISSAO: ${bilhete.dataHora}\n` +
-            "--------------------------------\n" +
-            "       APOSTAS INCLUIDAS        \n\n";
+        carrinho = [];
+        document.getElementById('lista-carrinho').innerText = "Nenhuma aposta adicionada.";
+        document.getElementById('total-bilhete').innerText = 0;
+    }
 
-        bilhete.apostas.forEach((ap, i) => {
-            textoEscPos += 
-                `[${i+1}] Sorteio: ${ap.sorteioNome} (${ap.horaSorteio}h)\n` +
-                `    Chance ${ap.chance}: ${ap.numeros.join(', ')}\n` +
-                `    Valor: ${ap.valor} MTN\n` +
-                " . . . . . . . . . . . . . . . .\n";
+    // ==========================================
+    // ALGORITMO DO SORTEIO INTELIGENTE (RETORNO DE 40% MAX)
+    // ==========================================
+    function executarSorteioInteligente() {
+        let drawId = document.getElementById('draw-sorteio-select').value;
+        let todosBilhetes = JSON.parse(localStorage.getItem('sistema_lotto_db')) || [];
+        
+        // 1. Filtrar todas as apostas feitas especificamente para este sorteio
+        let apostasDoSorteio = [];
+        todosBilhetes.forEach(b => {
+            b.apostas.forEach(ap => {
+                if(ap.sorteioId == drawId) apostasDoSorteio.push(ap);
+            });
         });
 
-        textoEscPos += 
-            "--------------------------------\n" +
-            `TOTAL DO BILHETE: ${bilhete.total} MTN\n` +
-            "--------------------------------\n" +
-            "    Conserve este documento.\n" +
-            "         Boa Sorte!\n\n\n\n\n";
+        // 2. Calcular Arrecadação Total do Sorteio e definir o teto de 40% para prêmios
+        let faturamentoSorteio = apostasDoSorteio.reduce((sum, item) => sum + item.valor, 0);
+        let tetoPremios = faturamentoSorteio * 0.40;
 
-        let encoder = new TextEncoder();
-        let bytes = encoder.encode(textoEscPos);
+        let bolasVencedoras = [];
+        let menorPrejuizoPremios = Infinity;
+        let melhorCombinacaoBolas = [];
 
-        bluetoothCharacteristic.writeValue(bytes)
-            .then(() => console.log("Impresso com sucesso via Bluetooth."))
-            .catch(err => console.error("Falha no envio de bytes: ", err));
+        // 3. Simulação de Risco (Roda 50 testes de combinações aleatórias)
+        for (let t = 0; t < 50; t++) {
+            let combinacaoTeste = [];
+            while(combinacaoTeste.length < 5) {
+                let n = Math.floor(Math.random() * 90) + 1;
+                if(!combinacaoTeste.includes(n)) combinacaoTeste.push(n);
+            }
+
+            // Calcula quanto a banca teria de pagar caso essa combinação fosse sorteada
+            let totalPremiosSimulado = 0;
+            apostasDoSorteio.forEach(ap => {
+                // Conta quantos acertos o jogador teve nesta simulação
+                let acertos = ap.numeros.filter(n => combinacaoTeste.includes(n)).length;
+                
+                // Tabela de prêmios fixos baseada nas regras de negócio informadas
+                if (ap.chance == 5) {
+                    if(acertos == 5) totalPremiosSimulado += 500000;
+                    if(acertos == 4) totalPremiosSimulado += 15000;
+                    if(acertos == 3) totalPremiosSimulado += 500;
+                    if(acertos == 2) totalPremiosSimulado += 50;
+                    if(acertos == 1) totalPremiosSimulado += 5;
+                } else if (ap.chance == 4) {
+                    if(acertos == 4) totalPremiosSimulado += 10000;
+                    if(acertos == 3) totalPremiosSimulado += 500;
+                    if(acertos == 2) totalPremiosSimulado += 100;
+                    if(acertos == 1) totalPremiosSimulado += 10;
+                } else if (ap.chance == 3) {
+                    if(acertos == 3) totalPremiosSimulado += 5000;
+                    if(acertos == 2) totalPremiosSimulado += 50;
+                    if(acertos == 1) totalPremiosSimulado += 5;
+                } else if (ap.chance == 2) {
+                    if(acertos == 2) totalPremiosSimulado += 250;
+                    if(acertos == 1) totalPremiosSimulado += 25;
+                }
+            });
+
+            // Se o prêmio simulado respeita a margem de segurança de 40%, guardamos imediatamente
+            if (totalPremiosSimulado <= tetoPremios) {
+                melhorCombinacaoBolas = combinacaoTeste;
+                menorPrejuizoPremios = totalPremiosSimulado;
+                break; // Encontrou um sorteio matematicamente seguro para a banca!
+            }
+
+            // Caso todas passem do teto, rastreia a que causa o menor impacto financeiro
+            if (totalPremiosSimulado < menorPrejuizoPremios) {
+                menorPrejuizoPremios = totalPremiosSimulado;
+                melhorCombinacaoBolas = combinacaoTeste;
+            }
+        }
+
+        // Se não houver apostas feitas, usa a última combinação aleatória gerada
+        if(melhorCombinacaoBolas.length === 0) {
+            while(melhorCombinacaoBolas.length < 5) {
+                let n = Math.floor(Math.random() * 90) + 1;
+                if(!melhorCombinacaoBolas.includes(n)) melhorCombinacaoBolas.push(n);
+            }
+            menorPrejuizoPremios = 0;
+        }
+
+        // Exibir resultado calculado na tela
+        document.getElementById('resultado-sorteio').innerHTML = `
+            🎰 Sorteio Apurado!<br>
+            Bolas Vencedoras: <span style="color:green; font-size:16px;">[${melhorCombinacaoBolas.sort((a,b)=>a-b).join(' - ')}]</span><br>
+            Faturamento Total: ${faturamentoSorteio} MTN<br>
+            Total Pago em Prêmios: ${menorPrejuizoPremios} MTN (~${faturamentoSorteio > 0 ? ((menorPrejuizoPremios/faturamentoSorteio)*100).toFixed(1) : 0}%)
+        `;
     }
 </script>
 </body>

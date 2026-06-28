@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sala de Avaliação - Madrassa Online</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a5f2a 0%, #0d3320 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 30px 0;
+        }
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .card h2 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            color: #a8e6cf;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            outline: none;
+        }
+        input::placeholder, textarea::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+        input:focus, textarea:focus {
+            background: rgba(255,255,255,0.25);
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: #2ecc71;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .btn-whatsapp {
+            background: #25D366;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .btn-whatsapp:hover {
+            background: #128C7E;
+        }
+        .question-box {
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #2ecc71;
+        }
+        .question-box h4 {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+        .options label {
+            display: block;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .options label:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .options input[type="radio"] {
+            width: auto;
+            margin-right: 10px;
+            margin-bottom: 0;
+        }
+        .hidden { display: none !important; }
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .mode-btn {
+            padding: 15px 25px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: transparent;
+            color: #fff;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        .mode-btn.active, .mode-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #2ecc71;
+        }
+        .result-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+        .result-correct {
+            background: rgba(46, 204, 113, 0.2);
+            border-left: 4px solid #2ecc71;
+        }
+        .result-wrong {
+            background: rgba(231, 76, 60, 0.2);
+            border-left: 4px solid #e74c3c;
+        }
+        .score-box {
+            text-align: center;
+            padding: 30px;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .alert-success { background: rgba(46, 204, 113, 0.3); }
+        .alert-error { background: rgba(231, 76, 60, 0.3); }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #2ecc71;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .small-text { font-size: 0.85rem; opacity: 0.8; }
+        .test-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .option-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .option-input input[type="radio"] {
+            width: auto;
+            margin-bottom: 0;
+        }
+        .remove-btn {
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .add-option-btn {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: 1px dashed rgba(255,255,255,0.4);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🕌 Sala de Avaliação</h1>
+            <p>Madrassa Online Moçambique</p>
+        </div>
+
+        <!-- SELETOR DE MODO -->
+        <div id="modeSelector" class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('student')">🎓 Sou Aluno</button>
+            <button class="mode-btn" onclick="setMode('teacher')">👨‍🏫 Sou Ustath</button>
+        </div>
+
+        <!-- MODO ALUNO -->
+        <div id="studentMode">
+            <!-- Passo 1: Dados do Aluno -->
+            <div id="studentStep1" class="card">
+                <h2>📝 Dados do Aluno</h2>
+                <input type="text" id="studentName" placeholder="Nome Completo">
+                <input type="tel" id="studentPhone" placeholder="Número de Telefone (ex: 84xxxxxxx)">
+                <button class="btn btn-primary" onclick="loadTest()">Ver Teste Disponível</button>
+                <div id="studentMsg"></div>
+            </div>
+
+            <!-- Passo 2: Fazer Teste -->
+            <div id="studentStep2" class="card hidden">
+                <div class="test-info">
+                    <h3 id="testTitle">Teste de Avaliação</h3>
+                    <p class="small-text" id="testDesc"></p>
+                </div>
+                <div id="questionsContainer"></div>
+                <button class="btn btn-primary" onclick="submitTest()">Finalizar Teste</button>
+            </div>
+
+            <!-- Passo 3: Resultado + PDF -->
+            <div id="studentStep3" class="card hidden">
+                <h2>✅ Teste Finalizado!</h2>
+                <div class="score-box" id="scoreDisplay"></div>
+                <div id="resultDetails"></div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">
+                        📱 Partilhar no WhatsApp
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadPDF()">
+                        📄 Download PDF
+                    </button>
+                    <button class="btn btn-secondary" onclick="location.reload()">
+                        🔄 Novo Teste
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODO USTATH -->
+        <div id="teacherMode" class="hidden">
+            <div class="card">
+                <h2>👨‍🏫 Criar Novo Teste</h2>
+                <input type="text" id="testTitleInput" placeholder="Título do Teste (ex: Fiqh - Aula 3)">
+                <textarea id="testDescInput" placeholder="Descrição breve do teste..."></textarea>
+                
+                <div id="teacherQuestions"></div>
+                
+                <button class="btn btn-secondary" onclick="addQuestion()">➕ Adicionar Pergunta</button>
+                <button class="btn btn-primary" onclick="publishTest()">📤 Publicar Teste</button>
+                <div id="teacherMsg"></div>
+            </div>
+
+            <!-- Testes Publicados -->
+            <div class="card">
+                <h2>📋 Testes Publicados</h2>
+                <div id="publishedTests"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== FIREBASE CONFIG ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD2rNS7HSJyek3OCrRquudFgqQSWXZJYrY",
+            authDomain: "madrassa-online-b851c.firebaseapp.com",
+            databaseURL: "https://madrassa-online-b851c-default-rtdb.firebaseio.com",
+            projectId: "madrassa-online-b851c",
+            storageBucket: "madrassa-online-b851c.firebasestorage.app",
+            messagingSenderId: "360782668012",
+            appId: "1:360782668012:web:d501ef187911db632445c9",
+            measurementId: "G-RV9GD4S22T"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // ==================== VARIÁVEIS GLOBAIS ====================
+        let currentTest = null;
+        let studentAnswers = {};
+        let studentData = {};
+        let testResult = null;
+        let teacherQuestions = [];
+
+        // ==================== MODO ====================
+        function setMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (mode === 'student') {
+                document.getElementById('studentMode').classList.remove('hidden');
+                document.getElementById('teacherMode').classList.add('hidden');
+            } else {
+                document.getElementById('studentMode').classList.add('hidden');
+                document.getElementById('teacherMode').classList.remove('hidden');
+                loadPublishedTests();
+            }
+        }
+
+        // ==================== ALUNO ====================
+        function showMsg(id, msg, type) {
+            const el = document.getElementById(id);
+            el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+            setTimeout(() => el.innerHTML = '', 4000);
+        }
+
+        function loadTest() {
+            const name = document.getElementById('studentName').value.trim();
+            const phone = document.getElementById('studentPhone').value.trim();
+
+            if (!name || !phone) {
+                showMsg('studentMsg', 'Por favor preencha nome e telefone!', 'error');
+                return;
+            }
+
+            studentData = { name, phone };
+
+            document.getElementById('studentStep1').innerHTML = '<div class="loading"><div class="spinner"></div><p>A carregar teste...</p></div>';
+
+            db.ref('tests/active').once('value').then(snapshot => {
+                const test = snapshot.val();
+                if (!test) {
+                    document.getElementById('studentStep1').innerHTML = `
+                        <h2>📝 Dados do Aluno</h2>
+                        <input type="text" id="studentName" value="${name}">
+                        <input type="tel" id="studentPhone" value="${phone}">
+                        <button class="btn btn-primary" onclick="loadTest()">Ver Teste Disponível</button>
+                        <div id="studentMsg"></div>
+                    `;
+                    showMsg('studentMsg', 'Nenhum teste disponível no momento. Contacte o Ustath.', 'error');
+                    return;
+                }
+
+                currentTest = test;
+                document.getElementById('studentStep1').classList.add('hidden');
+                document.getElementById('studentStep2').classList.remove('hidden');
+                document.getElementById('testTitle').textContent = test.title || 'Teste de Avaliação';
+                document.getElementById('testDesc').textContent = test.description || '';
+
+                const container = document.getElementById('questionsContainer');
+                container.innerHTML = '';
+
+                test.questions.forEach((q, idx) => {
+                    let optionsHtml = '';
+                    q.options.forEach((opt, optIdx) => {
+                        optionsHtml += `
+                            <label>
+                                <input type="radio" name="q${idx}" value="${optIdx}" onchange="studentAnswers[${idx}] = ${optIdx}">
+                                ${opt}
+                            </label>
+                        `;
+                    });
+
+                    container.innerHTML += `
+                        <div class="question-box">
+                            <h4>${idx + 1}. ${q.question}</h4>
+                            <div class="options">
+                                ${optionsHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function submitTest() {
+            if (!currentTest) return;
+
+            // Verificar se respondeu tudo
+            const total = currentTest.questions.length;
+            const answered = Object.keys(studentAnswers).length;
+            if (answered < total) {
+                alert(`Responda todas as ${total} perguntas! (Faltam ${total - answered})`);
+                return;
+            }
+
+            // Calcular resultado
+            let correct = 0;
+            const details = [];
+
+            currentTest.questions.forEach((q, idx) => {
+                const studentAns = studentAnswers[idx];
+                const isCorrect = studentAns === q.correct;
+                if (isCorrect) correct++;
+                
+                details.push({
+                    question: q.question,
+                    studentAnswer: q.options[studentAns],
+                    correctAnswer: q.options[q.correct],
+                    isCorrect: isCorrect
+                });
+            });
+
+            const percentage = Math.round((correct / total) * 100);
+            testResult = {
+                student: studentData,
+                testTitle: currentTest.title,
+                score: correct,
+                total: total,
+                percentage: percentage,
+                details: details,
+                date: new Date().toLocaleString('pt-PT'),
+                timestamp: Date.now()
+            };
+
+            // Guardar no Firebase
+            db.ref('results').push(testResult);
+
+            // Mostrar resultado
+            document.getElementById('studentStep2').classList.add('hidden');
+            document.getElementById('studentStep3').classList.remove('hidden');
+            document.getElementById('scoreDisplay').innerHTML = `${percentage}%<br><span style="font-size:1rem">${correct}/${total} corretas</span>`;
+
+            let detailsHtml = '';
+            details.forEach((d, i) => {
+                const cls = d.isCorrect ? 'result-correct' : 'result-wrong';
+                const icon = d.isCorrect ? '✅' : '❌';
+                detailsHtml += `
+                    <div class="result-item ${cls}">
+                        <strong>${i+1}. ${d.question}</strong><br>
+                        <span class="small-text">Sua resposta: ${d.studentAnswer} ${icon}</span><br>
+                        ${!d.isCorrect ? `<span class="small-text">Correta: ${d.correctAnswer}</span>` : ''}
+                    </div>
+                `;
+            });
+            document.getElementById('resultDetails').innerHTML = detailsHtml;
+        }
+
+        // ==================== PDF & WHATSAPP ====================
+        async function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Cabeçalho
+            doc.setFillColor(26, 95, 42);
+            doc.rect(0, 0, 210, 40, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.text('Sala de Avaliação - Madrassa Online', 105, 20, { align: 'center' });
+            doc.setFontSize(12);
+            doc.text('Moçambique', 105, 30, { align: 'center' });
+
+            // Info do aluno
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(14);
+            doc.text(`Aluno: ${testResult.student.name}`, 20, 55);
+            doc.text(`Telefone: ${testResult.student.phone}`, 20, 62);
+            doc.text(`Data: ${testResult.date}`, 20, 69);
+            doc.text(`Teste: ${testResult.testTitle}`, 20, 76);
+
+            // Score
+            doc.setFillColor(46, 204, 113);
+            doc.roundedRect(70, 85, 70, 25, 5, 5, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(18);
+            doc.text(`Nota: ${testResult.percentage}%`, 105, 100, { align: 'center' });
+            doc.setFontSize(11);
+            doc.text(`${testResult.score}/${testResult.total} corretas`, 105, 107, { align: 'center' });
+
+            // Perguntas e respostas
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            let y = 125;
+
+            testResult.details.forEach((d, i) => {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+                
+                doc.setFont(undefined, 'bold');
+                doc.text(`${i+1}. ${d.question}`, 20, y);
+                y += 8;
+                
+                doc.setFont(undefined, 'normal');
+                const status = d.isCorrect ? '✅ Correta' : '❌ Incorreta';
+                doc.text(`   Sua resposta: ${d.studentAnswer} ${status}`, 20, y);
+                y += 7;
+                
+                if (!d.isCorrect) {
+                    doc.setTextColor(231, 76, 60);
+                    doc.text(`   Resposta correta: ${d.correctAnswer}`, 20, y);
+                    doc.setTextColor(0, 0, 0);
+                    y += 7;
+                }
+                y += 5;
+            });
+
+            // Rodapé
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text('Madrassa Online Moçambique - Sala de Avaliação', 105, 285, { align: 'center' });
+
+            doc.save(`Teste_${testResult.student.name.replace(/\s+/g, '_')}.pdf`);
+        }
+
+        function shareWhatsApp() {
+            const text = `*Sala de Avaliação - Madrassa Online*%0A%0A` +
+                `*Aluno:* ${testResult.student.name}%0A` +
+                `*Telefone:* ${testResult.student.phone}%0A` +
+                `*Teste:* ${testResult.testTitle}%0A` +
+                `*Nota:* ${testResult.percentage}% (${testResult.score}/${testResult.total})%0A%0A` +
+                `*Respostas:*%0A` +
+                testResult.details.map((d, i) => 
+                    `${i+1}. ${d.question}%0A   ${d.isCorrect ? '✅' : '❌'} ${d.studentAnswer}`
+                ).join('%0A%0A');
+
+            window.open(`https://wa.me/258860407269?text=${text}`, '_blank');
+        }
+
+        // ==================== USTATH ====================
+        function addQuestion() {
+            const idx = teacherQuestions.length;
+            teacherQuestions.push({ question: '', options: ['', ''], correct: 0 });
+            renderTeacherQuestions();
+        }
+
+        function renderTeacherQuestions() {
+            const container = document.getElementById('teacherQuestions');
+            container.innerHTML = '';
+
+            teacherQuestions.forEach((q, qIdx) => {
+                let optionsHtml = '';
+                q.options.forEach((opt, oIdx) => {
+                    optionsHtml += `
+                        <div class="option-input">
+                            <input type="radio" name="correct${qIdx}" ${q.correct === oIdx ? 'checked' : ''} 
+                                onchange="teacherQuestions[${qIdx}].correct = ${oIdx}" title="Marcar como correta">
+                            <input type="text" value="${opt}" placeholder="Opção ${oIdx + 1}" 
+                                onchange="teacherQuestions[${qIdx}].options[${oIdx}] = this.value">
+                            ${q.options.length > 2 ? `<button class="remove-btn" onclick="removeOption(${qIdx}, ${oIdx})">✕</button>` : ''}
+                        </div>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="question-box">
+                        <div class="question-header">
+                            <h4>Pergunta ${qIdx + 1}</h4>
+                            <button class="remove-btn" onclick="removeQuestion(${qIdx})">Remover</button>
+                        </div>
+                        <input type="text" value="${q.question}" placeholder="Escreva a pergunta..." 
+                            onchange="teacherQuestions[${qIdx}].question = this.value">
+                        <p class="small-text" style="margin-bottom:8px">Marque a opção correta:</p>
+                        ${optionsHtml}
+                        <button class="add-option-btn" onclick="addOption(${qIdx})">+ Adicionar Opção</button>
+                    </div>
+                `;
+            });
+        }
+
+        function addOption(qIdx) {
+            teacherQuestions[qIdx].options.push('');
+            renderTeacherQuestions();
+        }
+
+        function removeOption(qIdx, oIdx) {
+            teacherQuestions[qIdx].options.splice(oIdx, 1);
+            if (teacherQuestions[qIdx].correct >= teacherQuestions[qIdx].options.length) {
+                teacherQuestions[qIdx].correct = 0;
+            }
+            renderTeacherQuestions();
+        }
+
+        function removeQuestion(idx) {
+            teacherQuestions.splice(idx, 1);
+            renderTeacherQuestions();
+        }
+
+        function publishTest() {
+            const title = document.getElementById('testTitleInput').value.trim();
+            const desc = document.getElementById('testDescInput').value.trim();
+
+            if (!title) {
+                showMsg('teacherMsg', 'Coloque um título para o teste!', 'error');
+                return;
+            }
+
+            // Validar perguntas
+            for (let q of teacherQuestions) {
+                if (!q.question.trim()) {
+                    showMsg('teacherMsg', 'Todas as perguntas devem ter texto!', 'error');
+                    return;
+                }
+                for (let opt of q.options) {
+                    if (!opt.trim()) {
+                        showMsg('teacherMsg', 'Todas as opções devem estar preenchidas!', 'error');
+                        return;
+                    }
+                }
+            }
+
+            if (teacherQuestions.length === 0) {
+                showMsg('teacherMsg', 'Adicione pelo menos uma pergunta!', 'error');
+                return;
+            }
+
+            const testData = {
+                title: title,
+                description: desc,
+                questions: teacherQuestions,
+                createdAt: Date.now()
+            };
+
+            db.ref('tests/active').set(testData).then(() => {
+                showMsg('teacherMsg', 'Teste publicado com sucesso!', 'success');
+                document.getElementById('testTitleInput').value = '';
+                document.getElementById('testDescInput').value = '';
+                teacherQuestions = [];
+                renderTeacherQuestions();
+                loadPublishedTests();
+            });
+        }
+
+        function loadPublishedTests() {
+            db.ref('tests/active').once('value').then(snapshot => {
+                const test = snapshot.val();
+                const container = document.getElementById('publishedTests');
+                
+                if (!test) {
+                    container.innerHTML = '<p class="small-text">Nenhum teste publicado.</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.1);padding:15px;border-radius:10px;">
+                        <h4>${test.title}</h4>
+                        <p class="small-text">${test.description || ''}</p>
+                        <p class="small-text">${test.questions.length} pergunta(s)</p>
+                        <button class="btn btn-danger" style="margin-top:10px" onclick="deleteTest()">🗑️ Eliminar Teste</button>
+                    </div>
+                `;
+            });
+        }
+
+        function deleteTest() {
+            if (confirm('Tem certeza que deseja eliminar o teste atual?')) {
+                db.ref('tests/active').remove().then(() => {
+                    loadPublishedTests();
+                    showMsg('teacherMsg', 'Teste eliminado!', 'success');
+                });
+            }
+        }
+
+        // Inicializar
+        addQuestion();
+    </script>
+</body>
+</html>

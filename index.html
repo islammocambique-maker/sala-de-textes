@@ -108,6 +108,16 @@
         .btn-whatsapp:hover {
             background: #128C7E;
         }
+        .btn-ustath {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 0.85rem;
+            padding: 8px 20px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .btn-ustath:hover {
+            background: rgba(255,255,255,0.25);
+        }
         .question-box {
             background: rgba(255,255,255,0.08);
             border-radius: 12px;
@@ -137,27 +147,6 @@
             margin-bottom: 0;
         }
         .hidden { display: none !important; }
-        .mode-selector {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .mode-btn {
-            padding: 15px 25px;
-            border: 2px solid rgba(255,255,255,0.3);
-            background: transparent;
-            color: #fff;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-        .mode-btn.active, .mode-btn:hover {
-            background: rgba(255,255,255,0.2);
-            border-color: #2ecc71;
-        }
         .result-item {
             padding: 12px;
             margin-bottom: 10px;
@@ -241,6 +230,32 @@
             align-items: center;
             margin-bottom: 10px;
         }
+        .password-section {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .password-section input {
+            max-width: 300px;
+            margin: 0 auto 15px;
+            display: block;
+            text-align: center;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+        }
+        .footer-btn {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+        }
+        .ustath-badge {
+            display: inline-block;
+            background: #f39c12;
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -250,13 +265,7 @@
             <p>Madrassa Online Moçambique</p>
         </div>
 
-        <!-- SELETOR DE MODO -->
-        <div id="modeSelector" class="mode-selector">
-            <button class="mode-btn active" onclick="setMode('student')">🎓 Sou Aluno</button>
-            <button class="mode-btn" onclick="setMode('teacher')">👨‍🏫 Sou Ustath</button>
-        </div>
-
-        <!-- MODO ALUNO -->
+        <!-- ==================== MODO ALUNO (PADRÃO) ==================== -->
         <div id="studentMode">
             <!-- Passo 1: Dados do Aluno -->
             <div id="studentStep1" class="card">
@@ -296,10 +305,24 @@
             </div>
         </div>
 
-        <!-- MODO USTATH -->
+        <!-- ==================== LOGIN USTATH ==================== -->
+        <div id="loginMode" class="hidden">
+            <div class="card password-section">
+                <h2>🔐 Área do Ustath</h2>
+                <p class="small-text" style="margin-bottom: 20px;">Apenas autorizado</p>
+                <input type="password" id="passwordInput" placeholder="Digite a senha">
+                <button class="btn btn-primary" onclick="checkPassword()">Entrar</button>
+                <div id="loginMsg" style="margin-top: 15px;"></div>
+                <button class="btn btn-secondary" style="margin-top: 20px;" onclick="showStudentMode()">← Voltar para Aluno</button>
+            </div>
+        </div>
+
+        <!-- ==================== MODO USTATH ==================== -->
         <div id="teacherMode" class="hidden">
+            <div class="ustath-badge">👨‍🏫 MODO USTATH</div>
+            
             <div class="card">
-                <h2>👨‍🏫 Criar Novo Teste</h2>
+                <h2>📝 Criar Novo Teste</h2>
                 <input type="text" id="testTitleInput" placeholder="Título do Teste (ex: Fiqh - Aula 3)">
                 <textarea id="testDescInput" placeholder="Descrição breve do teste..."></textarea>
                 
@@ -310,11 +333,22 @@
                 <div id="teacherMsg"></div>
             </div>
 
-            <!-- Testes Publicados -->
             <div class="card">
                 <h2>📋 Testes Publicados</h2>
                 <div id="publishedTests"></div>
             </div>
+
+            <div class="card">
+                <h2>📊 Resultados dos Alunos</h2>
+                <div id="studentResults"></div>
+            </div>
+
+            <button class="btn btn-secondary" onclick="logoutUstath()">🚪 Sair</button>
+        </div>
+
+        <!-- Botão discreto para Ustath -->
+        <div class="footer-btn" id="ustathAccessBtn">
+            <button class="btn btn-ustath" onclick="showLoginMode()">👨‍🏫 Acesso Ustath</button>
         </div>
     </div>
 
@@ -334,6 +368,8 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        const USTATH_PASSWORD = "Abdullah123456";
+
         // ==================== VARIÁVEIS GLOBAIS ====================
         let currentTest = null;
         let studentAnswers = {};
@@ -341,18 +377,41 @@
         let testResult = null;
         let teacherQuestions = [];
 
-        // ==================== MODO ====================
-        function setMode(mode) {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            if (mode === 'student') {
-                document.getElementById('studentMode').classList.remove('hidden');
-                document.getElementById('teacherMode').classList.add('hidden');
+        // ==================== NAVEGAÇÃO ====================
+        function showStudentMode() {
+            document.getElementById('studentMode').classList.remove('hidden');
+            document.getElementById('loginMode').classList.add('hidden');
+            document.getElementById('teacherMode').classList.add('hidden');
+            document.getElementById('ustathAccessBtn').classList.remove('hidden');
+        }
+
+        function showLoginMode() {
+            document.getElementById('studentMode').classList.add('hidden');
+            document.getElementById('loginMode').classList.remove('hidden');
+            document.getElementById('teacherMode').classList.add('hidden');
+            document.getElementById('ustathAccessBtn').classList.add('hidden');
+        }
+
+        function showTeacherMode() {
+            document.getElementById('studentMode').classList.add('hidden');
+            document.getElementById('loginMode').classList.add('hidden');
+            document.getElementById('teacherMode').classList.remove('hidden');
+            document.getElementById('ustathAccessBtn').classList.add('hidden');
+            loadPublishedTests();
+            loadStudentResults();
+        }
+
+        function logoutUstath() {
+            showStudentMode();
+        }
+
+        function checkPassword() {
+            const input = document.getElementById('passwordInput').value;
+            if (input === USTATH_PASSWORD) {
+                document.getElementById('passwordInput').value = '';
+                showTeacherMode();
             } else {
-                document.getElementById('studentMode').classList.add('hidden');
-                document.getElementById('teacherMode').classList.remove('hidden');
-                loadPublishedTests();
+                showMsg('loginMsg', 'Senha incorreta!', 'error');
             }
         }
 
@@ -425,7 +484,6 @@
         function submitTest() {
             if (!currentTest) return;
 
-            // Verificar se respondeu tudo
             const total = currentTest.questions.length;
             const answered = Object.keys(studentAnswers).length;
             if (answered < total) {
@@ -433,7 +491,6 @@
                 return;
             }
 
-            // Calcular resultado
             let correct = 0;
             const details = [];
 
@@ -462,10 +519,8 @@
                 timestamp: Date.now()
             };
 
-            // Guardar no Firebase
             db.ref('results').push(testResult);
 
-            // Mostrar resultado
             document.getElementById('studentStep2').classList.add('hidden');
             document.getElementById('studentStep3').classList.remove('hidden');
             document.getElementById('scoreDisplay').innerHTML = `${percentage}%<br><span style="font-size:1rem">${correct}/${total} corretas</span>`;
@@ -490,7 +545,6 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Cabeçalho
             doc.setFillColor(26, 95, 42);
             doc.rect(0, 0, 210, 40, 'F');
             doc.setTextColor(255, 255, 255);
@@ -499,7 +553,6 @@
             doc.setFontSize(12);
             doc.text('Moçambique', 105, 30, { align: 'center' });
 
-            // Info do aluno
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(14);
             doc.text(`Aluno: ${testResult.student.name}`, 20, 55);
@@ -507,7 +560,6 @@
             doc.text(`Data: ${testResult.date}`, 20, 69);
             doc.text(`Teste: ${testResult.testTitle}`, 20, 76);
 
-            // Score
             doc.setFillColor(46, 204, 113);
             doc.roundedRect(70, 85, 70, 25, 5, 5, 'F');
             doc.setTextColor(255, 255, 255);
@@ -516,7 +568,6 @@
             doc.setFontSize(11);
             doc.text(`${testResult.score}/${testResult.total} corretas`, 105, 107, { align: 'center' });
 
-            // Perguntas e respostas
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
             let y = 125;
@@ -545,7 +596,6 @@
                 y += 5;
             });
 
-            // Rodapé
             doc.setFontSize(10);
             doc.setTextColor(100, 100, 100);
             doc.text('Madrassa Online Moçambique - Sala de Avaliação', 105, 285, { align: 'center' });
@@ -635,7 +685,6 @@
                 return;
             }
 
-            // Validar perguntas
             for (let q of teacherQuestions) {
                 if (!q.question.trim()) {
                     showMsg('teacherMsg', 'Todas as perguntas devem ter texto!', 'error');
@@ -699,6 +748,30 @@
                     showMsg('teacherMsg', 'Teste eliminado!', 'success');
                 });
             }
+        }
+
+        function loadStudentResults() {
+            db.ref('results').orderByChild('timestamp').limitToLast(50).once('value').then(snapshot => {
+                const results = snapshot.val();
+                const container = document.getElementById('studentResults');
+                
+                if (!results) {
+                    container.innerHTML = '<p class="small-text">Nenhum resultado ainda.</p>';
+                    return;
+                }
+
+                let html = '';
+                Object.entries(results).reverse().forEach(([id, r]) => {
+                    html += `
+                        <div style="background:rgba(255,255,255,0.08);padding:12px;border-radius:8px;margin-bottom:8px;">
+                            <strong>${r.student.name}</strong> <span class="small-text">(${r.student.phone})</span><br>
+                            <span class="small-text">${r.testTitle} - ${r.percentage}% (${r.score}/${r.total})</span><br>
+                            <span class="small-text">${r.date}</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            });
         }
 
         // Inicializar
